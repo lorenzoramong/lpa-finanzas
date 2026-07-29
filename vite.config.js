@@ -15,7 +15,7 @@ export default defineConfig({
         description: 'Flujo de caja de la Liga de Padel del Atlántico',
         theme_color: '#172A46',
         background_color: '#ffffff',
-        display: 'browser',
+        display: 'standalone',
         start_url: './',
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
