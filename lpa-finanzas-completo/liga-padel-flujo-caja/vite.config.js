@@ -3,12 +3,20 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: './',
+  base: '/lpa-finanzas/',
+
   plugins: [
     react(),
+
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon-64.png','apple-touch-icon.png','logo-lpa.png'],
+
+      includeAssets: [
+        'favicon-64.png',
+        'apple-touch-icon.png',
+        'logo-lpa.png'
+      ],
+
       manifest: {
         name: 'LPA Finanzas',
         short_name: 'LPA Finanzas',
@@ -16,11 +24,26 @@ export default defineConfig({
         theme_color: '#172A46',
         background_color: '#ffffff',
         display: 'standalone',
-        start_url: './',
+        start_url: '/lpa-finanzas/',
+        scope: '/lpa-finanzas/',
+
         icons: [
-          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'pwa-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+          {
+            src: 'pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: 'pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png'
+          },
+          {
+            src: 'pwa-maskable-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
         ]
       }
     })
