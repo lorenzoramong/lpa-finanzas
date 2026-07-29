@@ -1,61 +1,106 @@
-const DB_NAME = 'lpa-finanzas-db';
-const DB_VERSION = 1;
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  writeBatch
+} from 'firebase/firestore';
+
+import { db as firestore } from './firebase';
+
 const STORES = ['movements', 'categories', 'settings'];
 
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      STORES.forEach((store) => {
-        if (!db.objectStoreNames.contains(store)) {
-          db.createObjectStore(store, { keyPath: 'id' });
-        }
-      });
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function withStore(storeName, mode, callback) {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(storeName, mode);
-    const store = tx.objectStore(storeName);
-    const result = callback(store);
-    tx.oncomplete = () => resolve(result?.result ?? result);
-    tx.onerror = () => reject(tx.error);
-  });
+function validateStore(store) {
+  if (!STORES.includes(store)) {
+    throw new Error(`Colección no válida: ${store}`);
+  }
 }
 
 export const db = {
-  getAll: (store) => withStore(store, 'readonly', (s) => s.getAll()),
-  get: (store, id) => withStore(store, 'readonly', (s) => s.get(id)),
-  put: (store, value) => withStore(store, 'readwrite', (s) => s.put(value)),
-  delete: (store, id) => withStore(store, 'readwrite', (s) => s.delete(id)),
-  clear: (store) => withStore(store, 'readwrite', (s) => s.clear()),
+  async getAll(store) {
+    validateStore(store);
+
+    const snapshot = await getDocs(collection(firestore, store));
+
+    return snapshot.docs.map((document) => ({
+      id: document.id,
+      ...document.data()
+    }));
+  },
+
+  async get(store, id) {
+    validateStore(store);
+
+    const snapshot = await getDoc(doc(firestore, store, id));
+
+    if (!snapshot.exists()) {
+      return undefined;
+    }
+
+    return {
+      id: snapshot.id,
+      ...snapshot.data()
+    };
+  },
+
+  async put(store, value) {
+    validateStore(store);
+
+    if (!value?.id) {
+      throw new Error('El registro debe tener un id.');
+    }
+
+    const { id, ...data } = value;
+
+    await setDoc(doc(firestore, store, id), data);
+
+    return value;
+  },
+
+  async delete(store, id) {
+    validateStore(store);
+
+    await deleteDoc(doc(firestore, store, id));
+  },
+
+  async clear(store) {
+    validateStore(store);
+
+    const snapshot = await getDocs(collection(firestore, store));
+    const batch = writeBatch(firestore);
+
+    snapshot.docs.forEach((document) => {
+      batch.delete(document.ref);
+    });
+
+    await batch.commit();
+  }
 };
 
 export async function seedDatabase() {
   const categories = await db.getAll('categories');
+
   if (!categories.length) {
     await db.put('categories', {
       id: crypto.randomUUID(),
       name: 'APC',
       color: '#172A46',
       subcategories: ['Cancha'],
-      createdAt: new Date().toISOString(),
+      createdAt: new Date().toISOString()
     });
   }
+
   const settings = await db.get('settings', 'general');
+
   if (!settings) {
     await db.put('settings', {
       id: 'general',
       initialBalance: 0,
       organizationName: 'Liga de Padel del Atlántico',
       currency: 'COP',
-      updatedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
   }
 }
