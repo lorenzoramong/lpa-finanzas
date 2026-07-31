@@ -235,6 +235,22 @@ export default function App() {
     }
   };
 
+  const updateCategory = async (category) => {
+    try {
+      if (!category?.id) {
+        throw new Error('La categoría no tiene un ID válido.');
+      }
+
+      await db.put('categories', {
+        ...category,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error al actualizar categoría:', error);
+      alert('No fue posible actualizar la categoría.');
+    }
+  };
+
   const deleteCategory = async (id) => {
     const confirmed = confirm(
       '¿Eliminar esta categoría? Los movimientos existentes no se borrarán.'
@@ -413,6 +429,7 @@ export default function App() {
         categories={categories}
         onSaveSettings={saveSettings}
         onAddCategory={addCategory}
+        onUpdateCategory={updateCategory}
         onDeleteCategory={deleteCategory}
         onBackup={backup}
         onRestore={restore}
