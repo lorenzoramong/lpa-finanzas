@@ -822,3 +822,48 @@ textarea:disabled {
     width: 100%;
   }
 }
+
+@media (max-width: 760px) {
+  .category-editor {
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .category-editor .form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-top: 18px;
+  }
+
+  .category-editor .form-actions button {
+    width: 100%;
+    min-height: 48px;
+    white-space: normal;
+    line-height: 1.2;
+    text-align: center;
+  }
+
+  .subcategory-add-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .subcategory-add-row input,
+  .subcategory-add-row .ghost-btn {
+    width: 100%;
+  }
+
+  .subcategory-edit-row {
+    grid-template-columns: minmax(0, 1fr) 48px;
+    width: 100%;
+  }
+
+  .category-card {
+    overflow: visible;
+  }
+}
