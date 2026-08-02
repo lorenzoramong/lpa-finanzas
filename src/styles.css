@@ -1032,20 +1032,44 @@ textarea:disabled {
     font-weight: 800;
   }
 
-  .bottom-nav button:nth-child(2) {
-    position: relative;
-    min-height: 62px;
-    border-radius: 18px;
-    background: var(--navy);
-    color: white;
-    transform: translateY(-7px);
-    box-shadow: 0 8px 20px rgba(23, 42, 70, 0.22);
-  }
+  .bottom-nav button {
+  position: relative;
+  background: transparent;
+  color: #78879a;
+  box-shadow: none;
+  transform: none;
+}
 
-  .bottom-nav button:nth-child(2).active {
-    background: var(--navy);
-    color: white;
-  }
+.bottom-nav button.active {
+  background: transparent;
+  color: var(--navy);
+  font-weight: 800;
+}
+
+.bottom-nav button.active::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 22%;
+  width: 56%;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--navy);
+}
+
+.bottom-nav button:nth-child(2) {
+  min-height: 54px;
+  border-radius: 12px;
+  background: transparent;
+  color: #78879a;
+  transform: none;
+  box-shadow: none;
+}
+
+.bottom-nav button:nth-child(2).active {
+  background: transparent;
+  color: var(--navy);
+}
 
   .summary-grid,
   .summary-grid.compact,
