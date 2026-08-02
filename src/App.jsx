@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { CalendarClock } from 'lucide-react';
 
 import Layout from './components/Layout';
+import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Movements from './pages/Movements';
 import History from './pages/History';
@@ -31,9 +33,14 @@ export default function App() {
         db.get('settings', 'general')
       ]);
 
-    setMovements(movementData);
-    setCategories(categoryData);
-    setSettings(settingsData);
+    setMovements(movementData || []);
+    setCategories(categoryData || []);
+    setSettings(
+      settingsData || {
+        initialBalance: 0
+      }
+    );
+
     setLoading(false);
   };
 
@@ -63,35 +70,39 @@ export default function App() {
       expenses,
       utility: income - expenses,
       balance:
-        Number(settings?.initialBalance || 0) +
+        Number(settings.initialBalance || 0) +
         income -
         expenses
     };
   }, [movements, settings]);
 
-  const openNewMovement = (type) => {
+  const openNewMovement = (type = 'income') => {
     setEditing(null);
     setInitialType(type);
     setTab('movements');
   };
 
   const saveMovement = async (data) => {
-    const item = {
-      ...data,
-      amount: Number(data.amount),
-      id: editing?.id || crypto.randomUUID(),
-      createdAt:
-        editing?.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    try {
+      const item = {
+        ...data,
+        amount: Number(data.amount),
+        id: editing?.id || crypto.randomUUID(),
+        createdAt:
+          editing?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-    await db.put('movements', item);
+      await db.put('movements', item);
 
-    setEditing(null);
-    await load();
+      setEditing(null);
+      await load();
 
-    // Después de guardar, regresa al Flujo de caja.
-    setTab('cashflow');
+      setTab('cashflow');
+    } catch (error) {
+      console.error('Error al guardar movimiento:', error);
+      alert('No fue posible guardar el movimiento.');
+    }
   };
 
   const deleteMovement = async (id) => {
@@ -103,8 +114,13 @@ export default function App() {
       return;
     }
 
-    await db.delete('movements', id);
-    await load();
+    try {
+      await db.delete('movements', id);
+      await load();
+    } catch (error) {
+      console.error('Error al eliminar movimiento:', error);
+      alert('No fue posible eliminar el movimiento.');
+    }
   };
 
   const editMovement = (movement) => {
@@ -114,14 +130,19 @@ export default function App() {
   };
 
   const addCategory = async (category) => {
-    await db.put('categories', {
-      ...category,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    });
+    try {
+      await db.put('categories', {
+        ...category,
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
 
-    await load();
+      await load();
+    } catch (error) {
+      console.error('Error al crear categoría:', error);
+      alert('No fue posible crear la categoría.');
+    }
   };
 
   const updateCategory = async (category) => {
@@ -130,12 +151,17 @@ export default function App() {
       return;
     }
 
-    await db.put('categories', {
-      ...category,
-      updatedAt: new Date().toISOString()
-    });
+    try {
+      await db.put('categories', {
+        ...category,
+        updatedAt: new Date().toISOString()
+      });
 
-    await load();
+      await load();
+    } catch (error) {
+      console.error('Error al actualizar categoría:', error);
+      alert('No fue posible actualizar la categoría.');
+    }
   };
 
   const deleteCategory = async (id) => {
@@ -147,22 +173,32 @@ export default function App() {
       return;
     }
 
-    await db.delete('categories', id);
-    await load();
+    try {
+      await db.delete('categories', id);
+      await load();
+    } catch (error) {
+      console.error('Error al eliminar categoría:', error);
+      alert('No fue posible eliminar la categoría.');
+    }
   };
 
   const saveSettings = async (newSettings) => {
-    await db.put('settings', {
-      ...newSettings,
-      id: 'general',
-      initialBalance: Number(
-        newSettings.initialBalance || 0
-      ),
-      updatedAt: new Date().toISOString()
-    });
+    try {
+      await db.put('settings', {
+        ...newSettings,
+        id: 'general',
+        initialBalance: Number(
+          newSettings.initialBalance || 0
+        ),
+        updatedAt: new Date().toISOString()
+      });
 
-    await load();
-    alert('Balance actualizado.');
+      await load();
+      alert('Balance actualizado.');
+    } catch (error) {
+      console.error('Error al guardar configuración:', error);
+      alert('No fue posible actualizar el balance.');
+    }
   };
 
   const backup = () => {
@@ -235,11 +271,7 @@ export default function App() {
       await load();
       alert('Respaldo restaurado.');
     } catch (error) {
-      console.error(
-        'Error al restaurar el respaldo:',
-        error
-      );
-
+      console.error('Error al restaurar respaldo:', error);
       alert('El archivo no es un respaldo válido.');
     }
   };
@@ -257,22 +289,26 @@ export default function App() {
     );
   }
 
-  const cashflowDashboard = (
-    <Dashboard
-      movements={movements}
-      settings={settings}
-      totals={totals}
-      onNewMovement={openNewMovement}
-      goHistory={() => setTab('history')}
-    />
-  );
-
   const content = {
-    // Temporalmente Inicio y Flujo de caja muestran
-    // el mismo Dashboard actual.
-    dashboard: cashflowDashboard,
+    dashboard: (
+      <Home
+        totals={totals}
+        movements={movements}
+        onNewMovement={openNewMovement}
+        goCashflow={() => setTab('cashflow')}
+        goProjections={() => setTab('projections')}
+      />
+    ),
 
-    cashflow: cashflowDashboard,
+    cashflow: (
+      <Dashboard
+        movements={movements}
+        settings={settings}
+        totals={totals}
+        onNewMovement={openNewMovement}
+        goHistory={() => setTab('history')}
+      />
+    ),
 
     movements: (
       <Movements
@@ -293,6 +329,31 @@ export default function App() {
         onEdit={editMovement}
         onDelete={deleteMovement}
       />
+    ),
+
+    projections: (
+      <div className="page">
+        <div className="page-title">
+          <p className="eyebrow">Planeación financiera</p>
+          <h1>Proyecciones</h1>
+          <p>
+            Próximamente podrás gestionar ingresos y egresos
+            proyectados.
+          </p>
+        </div>
+
+        <section className="panel empty-state">
+          <CalendarClock size={48} />
+
+          <h2>Módulo en construcción</h2>
+
+          <p>
+            Aquí agregaremos el flujo proyectado, las fechas de
+            pago, el semáforo de vencimientos y la conversión a
+            movimientos reales.
+          </p>
+        </section>
+      </div>
     ),
 
     stats: (
