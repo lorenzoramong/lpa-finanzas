@@ -2053,3 +2053,575 @@ body.center-menu-open {
     padding: 16px 0;
   }
 }
+/* =========================================================
+   DASHBOARD EJECUTIVO - INICIO
+   ========================================================= */
+
+.home-dashboard {
+  padding-bottom: 32px;
+}
+
+.home-dashboard .balance-hero {
+  margin-bottom: 22px;
+}
+
+.home-financial-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.home-financial-card {
+  position: relative;
+  min-width: 0;
+  min-height: 152px;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+  box-shadow:
+    0 9px 28px rgba(31, 51, 74, 0.07),
+    0 1px 2px rgba(31, 51, 74, 0.04);
+}
+
+.home-financial-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+}
+
+.home-financial-card.current::before {
+  background: var(--navy);
+}
+
+.home-financial-card.projected::before {
+  background: #3478c8;
+}
+
+.home-financial-card.receivable::before {
+  background: var(--green);
+}
+
+.home-financial-card.payable::before {
+  background: var(--red);
+}
+
+.home-financial-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+}
+
+.home-financial-card.current .home-financial-icon {
+  background: #edf1f6;
+  color: var(--navy);
+}
+
+.home-financial-card.projected .home-financial-icon {
+  background: #e7f0fb;
+  color: #3478c8;
+}
+
+.home-financial-card.receivable .home-financial-icon {
+  background: #e5f6ec;
+  color: var(--green);
+}
+
+.home-financial-card.payable .home-financial-icon {
+  background: #fdeaea;
+  color: var(--red);
+}
+
+.home-financial-card > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.home-financial-card small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.055em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.home-financial-card strong {
+  display: block;
+  width: 100%;
+  color: var(--navy);
+  font-size: clamp(1.4rem, 2vw, 1.85rem);
+  font-weight: 850;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-financial-card.projected strong {
+  color: #3478c8;
+}
+
+.home-financial-card.receivable strong {
+  color: var(--green);
+}
+
+.home-financial-card.payable strong {
+  color: var(--red);
+}
+
+/* Estado de compromisos */
+
+.home-commitments-panel {
+  margin-bottom: 18px;
+  padding: 24px;
+}
+
+.home-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.home-section-heading h2 {
+  margin: 3px 0 0;
+  font-size: 1.25rem;
+}
+
+.home-section-heading > svg {
+  flex: 0 0 auto;
+  color: #61748d;
+}
+
+.home-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.home-status-card {
+  min-width: 0;
+  min-height: 94px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fbfcfe;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.home-status-icon {
+  width: 43px;
+  height: 43px;
+  min-width: 43px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+}
+
+.home-status-card > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.home-status-card strong {
+  color: var(--navy);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.home-status-card small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.home-status-card.green .home-status-icon {
+  background: #e5f6ec;
+  color: var(--green);
+}
+
+.home-status-card.yellow .home-status-icon {
+  background: #fff3d6;
+  color: #a66e00;
+}
+
+.home-status-card.red .home-status-icon {
+  background: #fdeaea;
+  color: var(--red);
+}
+
+.home-status-card.completed .home-status-icon {
+  background: #e9eef5;
+  color: #5e7189;
+}
+
+/* Próxima acción y salud financiera */
+
+.home-insights-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.home-next-action,
+.home-health-card {
+  min-width: 0;
+  padding: 24px;
+}
+
+.home-next-action {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-next-action-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.home-next-action h3 {
+  margin: 0;
+  color: var(--navy);
+  font-size: clamp(1.35rem, 2.2vw, 1.85rem);
+  line-height: 1.18;
+  overflow-wrap: anywhere;
+}
+
+.home-next-action-value {
+  display: block;
+  margin-top: 10px;
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 850;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.home-due-badge {
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.home-due-badge.green {
+  background: #e5f6ec;
+  color: #087d40;
+}
+
+.home-due-badge.yellow {
+  background: #fff3d6;
+  color: #9b6800;
+}
+
+.home-due-badge.red {
+  background: #fdeaea;
+  color: #bd3131;
+}
+
+.home-next-action-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+  margin-top: 22px;
+  padding: 16px 0;
+  border-top: 1px solid #edf1f5;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.home-next-action-meta span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.home-next-action-meta strong {
+  color: var(--navy);
+}
+
+.home-open-projection-btn {
+  width: fit-content;
+  margin-top: 18px;
+  min-height: 44px;
+}
+
+.home-empty-insight {
+  min-height: 220px;
+  padding: 24px 12px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  text-align: center;
+}
+
+.home-empty-insight svg {
+  color: var(--green);
+}
+
+.home-empty-insight strong {
+  color: var(--navy);
+  font-size: 1.05rem;
+}
+
+.home-empty-insight span {
+  max-width: 390px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+/* Salud financiera */
+
+.home-health-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.home-health-card.good {
+  border-color: #cfe9da;
+}
+
+.home-health-card.warning {
+  border-color: #f0dfaa;
+}
+
+.home-health-card.risk {
+  border-color: #efcaca;
+}
+
+.home-health-card.good .home-section-heading > svg {
+  color: var(--green);
+}
+
+.home-health-card.warning .home-section-heading > svg {
+  color: #b37a00;
+}
+
+.home-health-card.risk .home-section-heading > svg {
+  color: var(--red);
+}
+
+.home-health-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px;
+  border-radius: 16px;
+  background: #f7f9fc;
+}
+
+.home-health-result > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.home-health-result small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.home-health-result strong {
+  color: var(--navy);
+  font-size: 1.22rem;
+}
+
+.home-health-dot {
+  width: 13px;
+  height: 13px;
+  min-width: 13px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 5px rgba(25, 135, 84, 0.1);
+}
+
+.home-health-card.good .home-health-dot {
+  background: var(--green);
+}
+
+.home-health-card.warning .home-health-dot {
+  background: #d99500;
+  box-shadow: 0 0 0 5px rgba(217, 149, 0, 0.12);
+}
+
+.home-health-card.risk .home-health-dot {
+  background: var(--red);
+  box-shadow: 0 0 0 5px rgba(214, 69, 69, 0.1);
+}
+
+.home-health-card > p {
+  margin: 16px 0;
+  color: #53657c;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.home-risk-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-top: auto;
+}
+
+.home-risk-item {
+  padding: 11px 12px;
+  border-radius: 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.home-risk-item svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.home-risk-item.good {
+  background: #edf8f2;
+  color: #176a43;
+}
+
+.home-risk-item.warning {
+  background: #fff5e3;
+  color: #845800;
+}
+
+/* =========================================================
+   DASHBOARD EJECUTIVO - RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 1280px) {
+  .home-financial-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1050px) {
+  .home-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-insights-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .home-dashboard .balance-hero {
+    margin-bottom: 16px;
+  }
+
+  .home-financial-grid {
+    grid-template-columns: 1fr;
+    gap: 11px;
+    margin-bottom: 14px;
+  }
+
+  .home-financial-card {
+    min-height: 128px;
+    padding: 17px;
+    gap: 14px;
+  }
+
+  .home-financial-icon {
+    width: 45px;
+    height: 45px;
+  }
+
+  .home-financial-card strong {
+    font-size: clamp(1.55rem, 8vw, 2rem);
+  }
+
+  .home-commitments-panel,
+  .home-next-action,
+  .home-health-card {
+    padding: 18px 15px;
+  }
+
+  .home-section-heading {
+    margin-bottom: 15px;
+  }
+
+  .home-section-heading .link-btn {
+    font-size: 0.78rem;
+  }
+
+  .home-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .home-status-card {
+    min-height: 86px;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .home-status-icon {
+    width: 39px;
+    height: 39px;
+    min-width: 39px;
+  }
+
+  .home-status-card strong {
+    font-size: 1.3rem;
+  }
+
+  .home-status-card small {
+    font-size: 0.7rem;
+  }
+
+  .home-insights-grid {
+    gap: 14px;
+  }
+
+  .home-next-action-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .home-next-action-meta {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .home-open-projection-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 390px) {
+  .home-status-grid {
+    grid-template-columns: 1fr;
+  }
+}
