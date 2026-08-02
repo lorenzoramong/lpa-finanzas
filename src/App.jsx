@@ -1,451 +1,263 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  collection,
-  doc,
-  onSnapshot
-} from 'firebase/firestore';
+  BarChart3,
+  CalendarClock,
+  ChevronRight,
+  History,
+  Home,
+  Landmark,
+  LayoutGrid,
+  PlusCircle,
+  Settings,
+  X
+} from 'lucide-react';
 
-import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Movements from './pages/Movements';
-import History from './pages/History';
-import Stats from './pages/Stats';
-import Settings from './pages/Settings';
+const primaryTabs = [
+  ['dashboard', 'Inicio', Home],
+  ['cashflow', 'Flujo de caja', Landmark],
+  ['movements', 'Nuevo movimiento', PlusCircle]
+];
 
-import { db, seedDatabase } from './lib/db';
-import { db as firestore } from './lib/firebase';
+const centerOptions = [
+  {
+    id: 'history',
+    label: 'Historial',
+    description: 'Consulta y administra todos los movimientos',
+    icon: History,
+    className: 'history'
+  },
+  {
+    id: 'projections',
+    label: 'Proyecciones',
+    description: 'Gestiona ingresos y egresos futuros',
+    icon: CalendarClock,
+    className: 'projections'
+  },
+  {
+    id: 'stats',
+    label: 'Estadísticas',
+    description: 'Indicadores, filtros y gráficos financieros',
+    icon: BarChart3,
+    className: 'stats'
+  },
+  {
+    id: 'settings',
+    label: 'Ajustes',
+    description: 'Categorías, balance y respaldos',
+    icon: Settings,
+    className: 'settings'
+  }
+];
 
-export default function App() {
-  const [tab, setTab] = useState('dashboard');
-  const [movements, setMovements] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [settings, setSettings] = useState({
-    initialBalance: 0,
-    organizationName: 'Liga de Padel del Atlántico',
-    currency: 'COP'
-  });
+const centerTabIds = centerOptions.map((option) => option.id);
 
-  const [initialType, setInitialType] = useState('income');
-  const [editing, setEditing] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [connectionError, setConnectionError] = useState('');
+export default function Layout({
+  activeTab,
+  setActiveTab,
+  children
+}) {
+  const [centerOpen, setCenterOpen] = useState(false);
+
+  const centerIsActive = centerTabIds.includes(activeTab);
 
   useEffect(() => {
-    let unsubscribeMovements;
-    let unsubscribeCategories;
-    let unsubscribeSettings;
-    let active = true;
-
-    async function connectFirestore() {
-      try {
-        await seedDatabase();
-
-        if (!active) {
-          return;
-        }
-
-        const loaded = {
-          movements: false,
-          categories: false,
-          settings: false
-        };
-
-        const checkLoading = () => {
-          if (
-            loaded.movements &&
-            loaded.categories &&
-            loaded.settings
-          ) {
-            setLoading(false);
-          }
-        };
-
-        unsubscribeMovements = onSnapshot(
-          collection(firestore, 'movements'),
-          (snapshot) => {
-            const data = snapshot.docs.map((document) => ({
-              id: document.id,
-              ...document.data()
-            }));
-
-            setMovements(data);
-            loaded.movements = true;
-            checkLoading();
-          },
-          (error) => {
-            console.error('Error al escuchar movimientos:', error);
-            setConnectionError(
-              'No fue posible sincronizar los movimientos con Firebase.'
-            );
-            setLoading(false);
-          }
-        );
-
-        unsubscribeCategories = onSnapshot(
-          collection(firestore, 'categories'),
-          (snapshot) => {
-            const data = snapshot.docs.map((document) => ({
-              id: document.id,
-              ...document.data()
-            }));
-
-            setCategories(data);
-            loaded.categories = true;
-            checkLoading();
-          },
-          (error) => {
-            console.error('Error al escuchar categorías:', error);
-            setConnectionError(
-              'No fue posible sincronizar las categorías con Firebase.'
-            );
-            setLoading(false);
-          }
-        );
-
-        unsubscribeSettings = onSnapshot(
-          doc(firestore, 'settings', 'general'),
-          (snapshot) => {
-            if (snapshot.exists()) {
-              setSettings({
-                id: snapshot.id,
-                ...snapshot.data()
-              });
-            }
-
-            loaded.settings = true;
-            checkLoading();
-          },
-          (error) => {
-            console.error('Error al escuchar configuración:', error);
-            setConnectionError(
-              'No fue posible sincronizar la configuración con Firebase.'
-            );
-            setLoading(false);
-          }
-        );
-      } catch (error) {
-        console.error('Error al conectar Firebase:', error);
-        setConnectionError(
-          'No fue posible conectar la aplicación con Firebase.'
-        );
-        setLoading(false);
-      }
+    if (!centerOpen) {
+      return undefined;
     }
 
-    connectFirestore();
+    const closeWithEscape = (event) => {
+      if (event.key === 'Escape') {
+        setCenterOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', closeWithEscape);
+    document.body.classList.add('center-menu-open');
 
     return () => {
-      active = false;
-
-      if (unsubscribeMovements) {
-        unsubscribeMovements();
-      }
-
-      if (unsubscribeCategories) {
-        unsubscribeCategories();
-      }
-
-      if (unsubscribeSettings) {
-        unsubscribeSettings();
-      }
+      document.removeEventListener('keydown', closeWithEscape);
+      document.body.classList.remove('center-menu-open');
     };
-  }, []);
+  }, [centerOpen]);
 
-  const totals = useMemo(() => {
-    const income = movements
-      .filter((movement) => movement.type === 'income')
-      .reduce(
-        (total, movement) => total + Number(movement.amount || 0),
-        0
-      );
-
-    const expenses = movements
-      .filter((movement) => movement.type === 'expense')
-      .reduce(
-        (total, movement) => total + Number(movement.amount || 0),
-        0
-      );
-
-    return {
-      income,
-      expenses,
-      utility: income - expenses,
-      balance:
-        Number(settings.initialBalance || 0) +
-        income -
-        expenses
-    };
-  }, [movements, settings]);
-
-  const saveMovement = async (data) => {
-    try {
-      const item = {
-        ...data,
-        amount: Number(data.amount),
-        id: editing?.id || crypto.randomUUID(),
-        createdAt:
-          editing?.createdAt || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      await db.put('movements', item);
-
-      setEditing(null);
-      setTab('dashboard');
-    } catch (error) {
-      console.error('Error al guardar movimiento:', error);
-      alert('No fue posible guardar el movimiento.');
-    }
+  const navigateTo = (tabId) => {
+    setActiveTab(tabId);
+    setCenterOpen(false);
   };
-
-  const deleteMovement = async (id) => {
-    const confirmed = confirm(
-      '¿Eliminar este movimiento? Esta acción no se puede deshacer.'
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await db.delete('movements', id);
-    } catch (error) {
-      console.error('Error al eliminar movimiento:', error);
-      alert('No fue posible eliminar el movimiento.');
-    }
-  };
-
-  const editMovement = (movement) => {
-    setEditing(movement);
-    setInitialType(movement.type);
-    setTab('movements');
-  };
-
-  const addCategory = async (category) => {
-    try {
-      await db.put('categories', {
-        ...category,
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error al guardar categoría:', error);
-      alert('No fue posible guardar la categoría.');
-    }
-  };
-
-  const updateCategory = async (category) => {
-    try {
-      if (!category?.id) {
-        throw new Error('La categoría no tiene un ID válido.');
-      }
-
-      await db.put('categories', {
-        ...category,
-        updatedAt: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error al actualizar categoría:', error);
-      alert('No fue posible actualizar la categoría.');
-    }
-  };
-
-  const deleteCategory = async (id) => {
-    const confirmed = confirm(
-      '¿Eliminar esta categoría? Los movimientos existentes no se borrarán.'
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      await db.delete('categories', id);
-    } catch (error) {
-      console.error('Error al eliminar categoría:', error);
-      alert('No fue posible eliminar la categoría.');
-    }
-  };
-
-  const saveSettings = async (newSettings) => {
-    try {
-      await db.put('settings', {
-        ...newSettings,
-        id: 'general',
-        initialBalance: Number(
-          newSettings.initialBalance || 0
-        ),
-        updatedAt: new Date().toISOString()
-      });
-
-      alert('Balance actualizado.');
-    } catch (error) {
-      console.error('Error al guardar configuración:', error);
-      alert('No fue posible actualizar el balance.');
-    }
-  };
-
-  const backup = () => {
-    const backupData = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      settings,
-      categories,
-      movements
-    };
-
-    const blob = new Blob(
-      [JSON.stringify(backupData, null, 2)],
-      { type: 'application/json' }
-    );
-
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-
-    link.href = url;
-    link.download =
-      `LPA-Backup-${new Date().toISOString().slice(0, 10)}.json`;
-
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const restore = async (file) => {
-    if (!file) {
-      return;
-    }
-
-    try {
-      const data = JSON.parse(await file.text());
-
-      const confirmed = confirm(
-        'Esto reemplazará los datos actuales. ¿Continuar?'
-      );
-
-      if (!confirmed) {
-        return;
-      }
-
-      await Promise.all([
-        db.clear('movements'),
-        db.clear('categories'),
-        db.clear('settings')
-      ]);
-
-      for (const movement of data.movements || []) {
-        await db.put('movements', movement);
-      }
-
-      for (const category of data.categories || []) {
-        await db.put('categories', category);
-      }
-
-      await db.put('settings', {
-        ...(data.settings || {}),
-        id: 'general',
-        updatedAt: new Date().toISOString()
-      });
-
-      alert('Respaldo restaurado.');
-    } catch (error) {
-      console.error('Error al restaurar respaldo:', error);
-      alert('El archivo no es un respaldo válido.');
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="splash">
-        <img
-          src={`${import.meta.env.BASE_URL}logo-lpa.png`}
-          alt="LPA"
-        />
-        <div className="loader" />
-      </div>
-    );
-  }
-
-  if (connectionError) {
-    return (
-      <div className="splash">
-        <img
-          src={`${import.meta.env.BASE_URL}logo-lpa.png`}
-          alt="LPA"
-        />
-
-        <p>{connectionError}</p>
-
-        <button onClick={() => window.location.reload()}>
-          Intentar nuevamente
-        </button>
-      </div>
-    );
-  }
-
-  const content = {
-    dashboard: (
-      <Dashboard
-        movements={movements}
-        settings={settings}
-        totals={totals}
-        onNewMovement={(type) => {
-          setEditing(null);
-          setInitialType(type);
-          setTab('movements');
-        }}
-        goHistory={() => setTab('history')}
-      />
-    ),
-
-    movements: (
-      <Movements
-        categories={categories}
-        initialType={initialType}
-        editing={editing}
-        onSave={saveMovement}
-        onCancelEdit={() => {
-          setEditing(null);
-          setTab('history');
-        }}
-      />
-    ),
-
-    history: (
-      <History
-        movements={movements}
-        onEdit={editMovement}
-        onDelete={deleteMovement}
-      />
-    ),
-
-    stats: (
-      <Stats movements={movements} />
-    ),
-
-    settings: (
-      <Settings
-        settings={settings}
-        categories={categories}
-        onSaveSettings={saveSettings}
-        onAddCategory={addCategory}
-        onUpdateCategory={updateCategory}
-        onDeleteCategory={deleteCategory}
-        onBackup={backup}
-        onRestore={restore}
-      />
-    )
-  }[tab];
 
   return (
-    <Layout
-      activeTab={tab}
-      setActiveTab={(newTab) => {
-        setEditing(null);
-        setTab(newTab);
-      }}
-    >
-      {content}
-    </Layout>
+    <div className="app-shell">
+      <aside className="desktop-sidebar">
+        <div className="sidebar-brand">
+          <img
+            src={`${import.meta.env.BASE_URL}logo-lpa.png`}
+            className="sidebar-logo"
+            alt="Logo LPA"
+          />
+
+          <div>
+            <strong>LPA Finanzas</strong>
+            <span>Liga de Padel del Atlántico</span>
+          </div>
+        </div>
+
+        <nav
+          className="sidebar-nav"
+          aria-label="Navegación principal"
+        >
+          {primaryTabs.map(([id, label, Icon]) => (
+            <button
+              key={id}
+              type="button"
+              className={activeTab === id ? 'active' : ''}
+              onClick={() => navigateTo(id)}
+            >
+              <Icon size={20} />
+              <span>{label}</span>
+            </button>
+          ))}
+
+          <button
+            type="button"
+            className={`sidebar-center-btn ${
+              centerIsActive || centerOpen ? 'active' : ''
+            }`}
+            onClick={() => setCenterOpen(true)}
+          >
+            <LayoutGrid size={20} />
+            <span>Centro</span>
+          </button>
+        </nav>
+      </aside>
+
+      <div className="app-content">
+        <header className="topbar">
+          <div className="brand-wrap">
+            <img
+              src={`${import.meta.env.BASE_URL}logo-lpa.png`}
+              className="brand-logo"
+              alt="Logo LPA"
+            />
+
+            <div>
+              <strong>LPA Finanzas</strong>
+              <span>Liga de Padel del Atlántico</span>
+            </div>
+          </div>
+        </header>
+
+        <main>{children}</main>
+      </div>
+
+      <nav
+        className="bottom-nav"
+        aria-label="Navegación móvil"
+      >
+        <button
+          type="button"
+          className={activeTab === 'dashboard' ? 'active' : ''}
+          onClick={() => navigateTo('dashboard')}
+        >
+          <Home size={20} />
+          <span>Inicio</span>
+        </button>
+
+        <button
+          type="button"
+          className={activeTab === 'cashflow' ? 'active' : ''}
+          onClick={() => navigateTo('cashflow')}
+        >
+          <Landmark size={20} />
+          <span>Flujo</span>
+        </button>
+
+        <button
+          type="button"
+          className={activeTab === 'movements' ? 'active' : ''}
+          onClick={() => navigateTo('movements')}
+        >
+          <PlusCircle size={20} />
+          <span>Nuevo</span>
+        </button>
+
+        <button
+          type="button"
+          className={centerIsActive || centerOpen ? 'active' : ''}
+          onClick={() => setCenterOpen(true)}
+        >
+          <LayoutGrid size={20} />
+          <span>Centro</span>
+        </button>
+      </nav>
+
+      {centerOpen && (
+        <div
+          className="center-overlay"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setCenterOpen(false);
+            }
+          }}
+        >
+          <section
+            className="center-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="center-title"
+          >
+            <div className="center-handle" />
+
+            <div className="center-sheet-header">
+              <div>
+                <p className="eyebrow">Navegación</p>
+                <h2 id="center-title">Centro financiero</h2>
+                <span>Herramientas y módulos de LPA Finanzas</span>
+              </div>
+
+              <button
+                type="button"
+                className="center-close-btn"
+                onClick={() => setCenterOpen(false)}
+                aria-label="Cerrar centro"
+              >
+                <X size={21} />
+              </button>
+            </div>
+
+            <div className="center-options">
+              {centerOptions.map((option) => {
+                const Icon = option.icon;
+
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={`center-option ${option.className} ${
+                      activeTab === option.id ? 'selected' : ''
+                    }`}
+                    onClick={() => navigateTo(option.id)}
+                  >
+                    <span className="center-option-icon">
+                      <Icon size={22} />
+                    </span>
+
+                    <span className="center-option-copy">
+                      <strong>{option.label}</strong>
+                      <small>{option.description}</small>
+                    </span>
+
+                    <ChevronRight
+                      className="center-option-arrow"
+                      size={19}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+      )}
+    </div>
   );
 }
