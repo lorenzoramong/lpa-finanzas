@@ -13,7 +13,6 @@ import { db, seedDatabase } from './lib/db';
 
 export default function App() {
   const [tab, setTab] = useState('dashboard');
-
   const [movements, setMovements] = useState([]);
   const [categories, setCategories] = useState([]);
   const [projections, setProjections] = useState([]);
@@ -93,18 +92,18 @@ export default function App() {
       expenses,
       utility: income - expenses,
       balance:
-        Number(settings?.initialBalance || 0) +
+        Number(settings.initialBalance || 0) +
         income -
         expenses
     };
   }, [movements, settings]);
 
   const projectionTotals = useMemo(() => {
-    const pending = projections.filter(
+    const pendingProjections = projections.filter(
       (projection) => projection.status !== 'completed'
     );
 
-    const projectedIncome = pending
+    const projectedIncome = pendingProjections
       .filter((projection) => projection.type === 'income')
       .reduce(
         (total, projection) =>
@@ -112,7 +111,7 @@ export default function App() {
         0
       );
 
-    const projectedExpenses = pending
+    const projectedExpenses = pendingProjections
       .filter((projection) => projection.type === 'expense')
       .reduce(
         (total, projection) =>
@@ -120,7 +119,7 @@ export default function App() {
         0
       );
 
-    const weightedIncome = pending
+    const weightedIncome = pendingProjections
       .filter((projection) => projection.type === 'income')
       .reduce(
         (total, projection) =>
@@ -164,6 +163,7 @@ export default function App() {
 
       setEditing(null);
       await load();
+
       setTab('cashflow');
     } catch (error) {
       console.error('Error al guardar movimiento:', error);
@@ -252,15 +252,13 @@ export default function App() {
   };
 
   const completeProjection = async (projection) => {
-    const actionText =
-      projection.type === 'income'
-        ? 'recibido'
-        : 'pagado';
+    const isIncome = projection.type === 'income';
+    const completedLabel = isIncome ? 'recibido' : 'pagado';
 
     const confirmed = confirm(
       `¿Confirmas que este ${
-        projection.type === 'income' ? 'ingreso' : 'egreso'
-      } ya fue ${actionText}?`
+        isIncome ? 'ingreso' : 'egreso'
+      } ya fue ${completedLabel}?`
     );
 
     if (!confirmed) {
@@ -278,13 +276,13 @@ export default function App() {
       });
 
       const registerAsMovement = confirm(
-        `La proyección fue marcada como ${actionText}.\n\n¿Deseas registrarla también como un movimiento real en el flujo de caja?`
+        `La proyección fue marcada como ${completedLabel}.\n\n¿Deseas registrarla también como movimiento real en el flujo de caja?`
       );
 
       if (registerAsMovement) {
         let projectionCategory = categories.find(
           (category) =>
-            category.name.trim().toLowerCase() ===
+            category.name?.trim().toLowerCase() ===
             'proyecciones'
         );
 
@@ -297,8 +295,8 @@ export default function App() {
               'Ingreso proyectado',
               'Egreso proyectado'
             ],
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            createdAt: completedAt,
+            updatedAt: completedAt
           };
 
           await db.put(
@@ -310,17 +308,16 @@ export default function App() {
         await db.put('movements', {
           id: crypto.randomUUID(),
           type: projection.type,
-          date: new Date().toISOString().slice(0, 10),
+          date: completedAt.slice(0, 10),
           amount: Number(projection.amount || 0),
           category: projectionCategory.name,
-          subcategory:
-            projection.type === 'income'
-              ? 'Ingreso proyectado'
-              : 'Egreso proyectado',
+          subcategory: isIncome
+            ? 'Ingreso proyectado'
+            : 'Egreso proyectado',
           description: projection.description,
           notes: [
             projection.notes,
-            `Generado desde la proyección ${projection.id}.`
+            `Creado desde la proyección ${projection.id}.`
           ]
             .filter(Boolean)
             .join(' '),
@@ -332,13 +329,11 @@ export default function App() {
 
       await load();
 
-      if (registerAsMovement) {
-        alert(
-          'La proyección se completó y el movimiento real fue creado.'
-        );
-      } else {
-        alert('La proyección fue completada.');
-      }
+      alert(
+        registerAsMovement
+          ? 'La proyección se completó y el movimiento real fue creado.'
+          : 'La proyección fue completada.'
+      );
     } catch (error) {
       console.error(
         'Error al completar proyección:',
@@ -379,11 +374,7 @@ export default function App() {
 
       await load();
     } catch (error) {
-      console.error(
-        'Error al actualizar categoría:',
-        error
-      );
-
+      console.error('Error al actualizar categoría:', error);
       alert('No fue posible actualizar la categoría.');
     }
   };
@@ -426,11 +417,7 @@ export default function App() {
       await load();
       alert('Configuración actualizada.');
     } catch (error) {
-      console.error(
-        'Error al guardar configuración:',
-        error
-      );
-
+      console.error('Error al guardar configuración:', error);
       alert('No fue posible actualizar la configuración.');
     }
   };
@@ -511,11 +498,7 @@ export default function App() {
       await load();
       alert('Respaldo restaurado.');
     } catch (error) {
-      console.error(
-        'Error al restaurar el respaldo:',
-        error
-      );
-
+      console.error('Error al restaurar respaldo:', error);
       alert('El archivo no es un respaldo válido.');
     }
   };
