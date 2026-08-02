@@ -1,263 +1,223 @@
-import { useEffect, useState } from 'react';
-import {
-  BarChart3,
-  CalendarClock,
-  ChevronRight,
-  History,
-  Home,
-  Landmark,
-  LayoutGrid,
-  PlusCircle,
-  Settings,
-  X
-} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import Layout from './components/Layout';
+import Dashboard from './pages/Dashboard';
+import Movements from './pages/Movements';
+import History from './pages/History';
+import Stats from './pages/Stats';
+import Settings from './pages/Settings';
+import { db, seedDatabase } from './lib/db';
 
-const primaryTabs = [
-  ['dashboard', 'Inicio', Home],
-  ['cashflow', 'Flujo de caja', Landmark],
-  ['movements', 'Nuevo movimiento', PlusCircle]
-];
+export default function App(){
+  const [tab,setTab]=useState('dashboard');
+  const [movements,setMovements]=useState([]);
+  const [categories,setCategories]=useState([]);
+  const [settings,setSettings]=useState({initialBalance:0});
+  const [initialType,setInitialType]=useState('income');
+  const [editing,setEditing]=useState(null);
+  const [loading,setLoading]=useState(true);
 
-const centerOptions = [
-  {
-    id: 'history',
-    label: 'Historial',
-    description: 'Consulta y administra todos los movimientos',
-    icon: History,
-    className: 'history'
-  },
-  {
-    id: 'projections',
-    label: 'Proyecciones',
-    description: 'Gestiona ingresos y egresos futuros',
-    icon: CalendarClock,
-    className: 'projections'
-  },
-  {
-    id: 'stats',
-    label: 'Estadísticas',
-    description: 'Indicadores, filtros y gráficos financieros',
-    icon: BarChart3,
-    className: 'stats'
-  },
-  {
-    id: 'settings',
-    label: 'Ajustes',
-    description: 'Categorías, balance y respaldos',
-    icon: Settings,
-    className: 'settings'
-  }
-];
-
-const centerTabIds = centerOptions.map((option) => option.id);
-
-export default function Layout({
-  activeTab,
-  setActiveTab,
-  children
-}) {
-  const [centerOpen, setCenterOpen] = useState(false);
-
-  const centerIsActive = centerTabIds.includes(activeTab);
-
-  useEffect(() => {
-    if (!centerOpen) {
-      return undefined;
-    }
-
-    const closeWithEscape = (event) => {
-      if (event.key === 'Escape') {
-        setCenterOpen(false);
-      }
-    };
-
-    document.addEventListener('keydown', closeWithEscape);
-    document.body.classList.add('center-menu-open');
-
-    return () => {
-      document.removeEventListener('keydown', closeWithEscape);
-      document.body.classList.remove('center-menu-open');
-    };
-  }, [centerOpen]);
-
-  const navigateTo = (tabId) => {
-    setActiveTab(tabId);
-    setCenterOpen(false);
+  const load=async()=>{
+    await seedDatabase();
+    const [m,c,s]=await Promise.all([
+      db.getAll('movements'),
+      db.getAll('categories'),
+      db.get('settings','general')
+    ]);
+    setMovements(m);
+    setCategories(c);
+    setSettings(s);
+    setLoading(false);
   };
 
-  return (
-    <div className="app-shell">
-      <aside className="desktop-sidebar">
-        <div className="sidebar-brand">
-          <img
-            src={`${import.meta.env.BASE_URL}logo-lpa.png`}
-            className="sidebar-logo"
-            alt="Logo LPA"
-          />
+  useEffect(()=>{
+    load();
+  },[]);
 
-          <div>
-            <strong>LPA Finanzas</strong>
-            <span>Liga de Padel del Atlántico</span>
-          </div>
-        </div>
+  const totals=useMemo(()=>{
+    const income=movements
+      .filter(m=>m.type==='income')
+      .reduce((a,b)=>a+b.amount,0);
 
-        <nav
-          className="sidebar-nav"
-          aria-label="Navegación principal"
-        >
-          {primaryTabs.map(([id, label, Icon]) => (
-            <button
-              key={id}
-              type="button"
-              className={activeTab === id ? 'active' : ''}
-              onClick={() => navigateTo(id)}
-            >
-              <Icon size={20} />
-              <span>{label}</span>
-            </button>
-          ))}
+    const expenses=movements
+      .filter(m=>m.type==='expense')
+      .reduce((a,b)=>a+b.amount,0);
 
-          <button
-            type="button"
-            className={`sidebar-center-btn ${
-              centerIsActive || centerOpen ? 'active' : ''
-            }`}
-            onClick={() => setCenterOpen(true)}
-          >
-            <LayoutGrid size={20} />
-            <span>Centro</span>
-          </button>
-        </nav>
-      </aside>
+    return{
+      income,
+      expenses,
+      utility:income-expenses,
+      balance:Number(settings.initialBalance||0)+income-expenses
+    };
+  },[movements,settings]);
 
-      <div className="app-content">
-        <header className="topbar">
-          <div className="brand-wrap">
-            <img
-              src={`${import.meta.env.BASE_URL}logo-lpa.png`}
-              className="brand-logo"
-              alt="Logo LPA"
-            />
+  const saveMovement=async(data)=>{
+    const item={
+      ...data,
+      id:editing?.id||crypto.randomUUID(),
+      createdAt:editing?.createdAt||new Date().toISOString(),
+      updatedAt:new Date().toISOString()
+    };
 
-            <div>
-              <strong>LPA Finanzas</strong>
-              <span>Liga de Padel del Atlántico</span>
-            </div>
-          </div>
-        </header>
+    await db.put('movements',item);
 
-        <main>{children}</main>
+    setEditing(null);
+    await load();
+    setTab('dashboard');
+  };
+
+  const deleteMovement=async(id)=>{
+    if(confirm('¿Eliminar este movimiento? Esta acción no se puede deshacer.')){
+      await db.delete('movements',id);
+      await load();
+    }
+  };
+
+  const editMovement=(m)=>{
+    setEditing(m);
+    setTab('movements');
+  };
+
+  const addCategory=async(c)=>{
+    await db.put('categories',{
+      ...c,
+      id:crypto.randomUUID(),
+      createdAt:new Date().toISOString()
+    });
+    await load();
+  };
+
+  const deleteCategory=async(id)=>{
+    if(confirm('¿Eliminar esta categoría? Los movimientos existentes no se borrarán.')){
+      await db.delete('categories',id);
+      await load();
+    }
+  };
+
+  const saveSettings=async(s)=>{
+    await db.put('settings',{
+      ...s,
+      id:'general',
+      updatedAt:new Date().toISOString()
+    });
+
+    await load();
+    alert('Balance actualizado.');
+  };
+
+  const backup=()=>{
+    const blob=new Blob(
+      [JSON.stringify({
+        version:1,
+        exportedAt:new Date().toISOString(),
+        settings,
+        categories,
+        movements
+      },null,2)],
+      {type:'application/json'}
+    );
+
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=`LPA-Backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const restore=async(file)=>{
+    if(!file)return;
+
+    try{
+      const data=JSON.parse(await file.text());
+
+      if(!confirm('Esto reemplazará los datos actuales. ¿Continuar?')) return;
+
+      for(const store of ['movements','categories','settings'])
+        await db.clear(store);
+
+      for(const m of data.movements||[])
+        await db.put('movements',m);
+
+      for(const c of data.categories||[])
+        await db.put('categories',c);
+
+      await db.put('settings',{
+        ...(data.settings||{}),
+        id:'general'
+      });
+
+      await load();
+      alert('Respaldo restaurado.');
+    }catch{
+      alert('El archivo no es un respaldo válido.');
+    }
+  };
+
+  if(loading)
+    return(
+      <div className="splash">
+        <img
+          src={`${import.meta.env.BASE_URL}logo-lpa.png`}
+          alt="LPA"
+        />
+        <div className="loader"/>
       </div>
+    );
 
-      <nav
-        className="bottom-nav"
-        aria-label="Navegación móvil"
-      >
-        <button
-          type="button"
-          className={activeTab === 'dashboard' ? 'active' : ''}
-          onClick={() => navigateTo('dashboard')}
-        >
-          <Home size={20} />
-          <span>Inicio</span>
-        </button>
+  const content={
+    dashboard:
+      <Dashboard
+        movements={movements}
+        settings={settings}
+        totals={totals}
+        onNewMovement={(t)=>{
+          setEditing(null);
+          setInitialType(t);
+          setTab('movements');
+        }}
+        goHistory={()=>setTab('history')}
+      />,
+    movements:
+      <Movements
+        categories={categories}
+        initialType={initialType}
+        editing={editing}
+        onSave={saveMovement}
+        onCancelEdit={()=>{
+          setEditing(null);
+          setTab('history');
+        }}
+      />,
+    history:
+      <History
+        movements={movements}
+        onEdit={editMovement}
+        onDelete={deleteMovement}
+      />,
+    stats:
+      <Stats
+        movements={movements}
+      />,
+    settings:
+      <Settings
+        settings={settings}
+        categories={categories}
+        onSaveSettings={saveSettings}
+        onAddCategory={addCategory}
+        onDeleteCategory={deleteCategory}
+        onBackup={backup}
+        onRestore={restore}
+      />
+  }[tab];
 
-        <button
-          type="button"
-          className={activeTab === 'cashflow' ? 'active' : ''}
-          onClick={() => navigateTo('cashflow')}
-        >
-          <Landmark size={20} />
-          <span>Flujo</span>
-        </button>
-
-        <button
-          type="button"
-          className={activeTab === 'movements' ? 'active' : ''}
-          onClick={() => navigateTo('movements')}
-        >
-          <PlusCircle size={20} />
-          <span>Nuevo</span>
-        </button>
-
-        <button
-          type="button"
-          className={centerIsActive || centerOpen ? 'active' : ''}
-          onClick={() => setCenterOpen(true)}
-        >
-          <LayoutGrid size={20} />
-          <span>Centro</span>
-        </button>
-      </nav>
-
-      {centerOpen && (
-        <div
-          className="center-overlay"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setCenterOpen(false);
-            }
-          }}
-        >
-          <section
-            className="center-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="center-title"
-          >
-            <div className="center-handle" />
-
-            <div className="center-sheet-header">
-              <div>
-                <p className="eyebrow">Navegación</p>
-                <h2 id="center-title">Centro financiero</h2>
-                <span>Herramientas y módulos de LPA Finanzas</span>
-              </div>
-
-              <button
-                type="button"
-                className="center-close-btn"
-                onClick={() => setCenterOpen(false)}
-                aria-label="Cerrar centro"
-              >
-                <X size={21} />
-              </button>
-            </div>
-
-            <div className="center-options">
-              {centerOptions.map((option) => {
-                const Icon = option.icon;
-
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={`center-option ${option.className} ${
-                      activeTab === option.id ? 'selected' : ''
-                    }`}
-                    onClick={() => navigateTo(option.id)}
-                  >
-                    <span className="center-option-icon">
-                      <Icon size={22} />
-                    </span>
-
-                    <span className="center-option-copy">
-                      <strong>{option.label}</strong>
-                      <small>{option.description}</small>
-                    </span>
-
-                    <ChevronRight
-                      className="center-option-arrow"
-                      size={19}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        </div>
-      )}
-    </div>
+  return(
+    <Layout
+      activeTab={tab}
+      setActiveTab={(t)=>{
+        setEditing(null);
+        setTab(t);
+      }}
+    >
+      {content}
+    </Layout>
   );
 }
