@@ -1479,3 +1479,556 @@ body.center-menu-open {
     transform: translateY(0);
   }
 }
+
+/* =========================================================
+   MÓDULO DE PROYECCIONES
+   ========================================================= */
+
+/* Encabezado */
+
+.page > .page-title.row-title {
+  margin-bottom: 28px;
+}
+
+.page > .page-title.row-title > div {
+  min-width: 0;
+}
+
+.page > .page-title.row-title h1 {
+  margin-top: 6px;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.05;
+}
+
+.page > .page-title.row-title .primary-btn {
+  flex: 0 0 auto;
+  min-height: 52px;
+  padding: 14px 22px;
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(23, 42, 70, 0.16);
+}
+
+/* =========================================================
+   TARJETAS DE RESUMEN
+   ========================================================= */
+
+.projection-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 26px;
+}
+
+.projection-summary-card {
+  position: relative;
+  min-width: 0;
+  min-height: 152px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  overflow: hidden;
+  box-shadow:
+    0 10px 30px rgba(31, 51, 74, 0.07),
+    0 1px 2px rgba(31, 51, 74, 0.04);
+}
+
+.projection-summary-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+  opacity: 0.9;
+}
+
+.projection-summary-card.income::before {
+  background: var(--green);
+}
+
+.projection-summary-card.expense::before {
+  background: var(--red);
+}
+
+.projection-summary-card.utility::before {
+  background: #3478c8;
+}
+
+.projection-summary-card.probable::before {
+  background: #7b55b7;
+}
+
+.projection-summary-card > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.projection-summary-card small {
+  color: var(--muted);
+  font-size: 0.77rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.projection-summary-card strong {
+  color: var(--navy);
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.projection-summary-card.income strong {
+  color: var(--green);
+}
+
+.projection-summary-card.expense strong {
+  color: var(--red);
+}
+
+.projection-summary-card.utility strong {
+  color: #3478c8;
+}
+
+.projection-summary-card.probable strong {
+  color: #7547b6;
+}
+
+.projection-summary-icon {
+  width: 58px;
+  height: 58px;
+  min-width: 58px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.projection-summary-card.income .projection-summary-icon {
+  background: #e3f5eb;
+  color: var(--green);
+}
+
+.projection-summary-card.expense .projection-summary-icon {
+  background: #fde7e7;
+  color: var(--red);
+}
+
+.projection-summary-card.utility .projection-summary-icon {
+  background: #e6f0fb;
+  color: #3478c8;
+}
+
+.projection-summary-card.probable .projection-summary-icon {
+  background: #f0e8fa;
+  color: #7547b6;
+}
+
+/* =========================================================
+   FORMULARIO DE PROYECCIÓN
+   ========================================================= */
+
+.projection-form {
+  margin-bottom: 26px;
+  padding: 26px;
+}
+
+.projection-form .panel-heading {
+  margin-bottom: 18px;
+}
+
+.projection-form .panel-heading h2 {
+  margin-bottom: 0;
+}
+
+.projection-form .segmented {
+  max-width: 560px;
+}
+
+.projection-form .form-actions {
+  padding-top: 4px;
+}
+
+.projection-form .form-actions button {
+  min-height: 48px;
+}
+
+/* =========================================================
+   PANEL DE COMPROMISOS
+   ========================================================= */
+
+.projection-list-panel {
+  padding: 28px;
+}
+
+.projection-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 22px;
+  margin-bottom: 24px;
+}
+
+.projection-toolbar h2 {
+  margin: 4px 0 0;
+  font-size: 1.45rem;
+}
+
+.projection-filters {
+  display: grid;
+  grid-template-columns: 210px 210px;
+  gap: 12px;
+}
+
+.projection-filters select {
+  min-height: 48px;
+  padding: 10px 40px 10px 14px;
+  border-radius: 13px;
+  background-color: #ffffff;
+  font-weight: 700;
+}
+
+.projection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* =========================================================
+   TARJETA INDIVIDUAL DE PROYECCIÓN
+   ========================================================= */
+
+.projection-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(31, 51, 74, 0.06);
+}
+
+.projection-status-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+}
+
+.projection-card.green .projection-status-bar {
+  background: var(--green);
+}
+
+.projection-card.yellow .projection-status-bar {
+  background: #e7a800;
+}
+
+.projection-card.red .projection-status-bar {
+  background: var(--red);
+}
+
+.projection-card.completed .projection-status-bar {
+  background: #8b98a8;
+}
+
+.projection-card-content {
+  padding: 22px 22px 22px 28px;
+}
+
+.projection-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 18px;
+}
+
+.projection-card-header > div {
+  min-width: 0;
+}
+
+.projection-card-header h3 {
+  margin: 10px 0 0;
+  color: var(--navy);
+  font-size: 1.28rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.projection-card-header > strong {
+  flex: 0 0 auto;
+  font-size: 1.45rem;
+  line-height: 1.2;
+}
+
+.projection-card .type-pill {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.projection-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid #edf1f5;
+  border-bottom: 1px solid #edf1f5;
+}
+
+.projection-meta-grid > div {
+  min-width: 0;
+  padding: 16px 18px;
+  border-right: 1px solid #edf1f5;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.projection-meta-grid > div:first-child {
+  padding-left: 0;
+}
+
+.projection-meta-grid > div:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+
+.projection-meta-grid small {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.projection-meta-grid strong {
+  color: var(--navy);
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.projection-status-badge {
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.projection-status-badge.green {
+  background: #e3f5eb;
+  color: #087d40;
+}
+
+.projection-status-badge.yellow {
+  background: #fff4d5;
+  color: #9d6b00;
+}
+
+.projection-status-badge.red {
+  background: #fde7e7;
+  color: #bd3131;
+}
+
+.projection-status-badge.completed {
+  background: #edf1f5;
+  color: #687789;
+}
+
+.projection-notes {
+  margin: 0;
+  padding: 18px 0;
+  color: #43546a;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.projection-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+  flex-wrap: wrap;
+}
+
+.projection-card-actions button {
+  min-height: 44px;
+  padding: 10px 15px;
+  border: 0;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-weight: 750;
+}
+
+.projection-complete-btn {
+  background: var(--green);
+  color: #ffffff;
+  box-shadow: 0 7px 16px rgba(25, 135, 84, 0.18);
+}
+
+.projection-complete-btn:hover {
+  background: #137244;
+}
+
+.projection-card-actions .ghost-btn {
+  background: #eef2f6;
+  color: var(--navy);
+}
+
+.projection-delete-btn {
+  background: #fff0f0;
+  color: var(--red);
+}
+
+.projection-delete-btn:hover {
+  background: #fde2e2;
+}
+
+/* Proyección completada */
+
+.projection-card.completed {
+  opacity: 0.78;
+}
+
+.projection-card.completed .projection-card-header > strong {
+  color: #738195;
+}
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 1180px) {
+  .projection-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .projection-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .projection-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .projection-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .projection-meta-grid > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .projection-meta-grid > div:nth-child(-n + 2) {
+    border-bottom: 1px solid #edf1f5;
+  }
+
+  .projection-meta-grid > div:nth-child(3) {
+    padding-left: 0;
+  }
+}
+
+/* =========================================================
+   CELULAR
+   ========================================================= */
+
+@media (max-width: 760px) {
+  .page > .page-title.row-title {
+    align-items: stretch;
+    gap: 18px;
+    margin-bottom: 22px;
+  }
+
+  .page > .page-title.row-title .primary-btn {
+    width: 100%;
+  }
+
+  .projection-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .projection-summary-card {
+    min-height: 118px;
+    padding: 18px;
+  }
+
+  .projection-summary-icon {
+    width: 52px;
+    height: 52px;
+    min-width: 52px;
+  }
+
+  .projection-list-panel {
+    padding: 18px 14px;
+  }
+
+  .projection-toolbar {
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .projection-filters {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .projection-filters select {
+    width: 100%;
+  }
+
+  .projection-card-content {
+    padding: 18px 16px 18px 22px;
+  }
+
+  .projection-card-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .projection-card-header > strong {
+    font-size: 1.35rem;
+  }
+
+  .projection-meta-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .projection-meta-grid > div,
+  .projection-meta-grid > div:first-child,
+  .projection-meta-grid > div:nth-child(3),
+  .projection-meta-grid > div:last-child {
+    padding: 13px 0;
+    border-right: 0;
+    border-bottom: 1px solid #edf1f5;
+  }
+
+  .projection-meta-grid > div:last-child {
+    border-bottom: 0;
+  }
+
+  .projection-card-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .projection-card-actions button {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .projection-notes {
+    padding: 16px 0;
+  }
+}
