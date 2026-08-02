@@ -10,7 +10,12 @@ import {
 
 import { db as firestore } from './firebase';
 
-const STORES = ['movements', 'categories', 'settings'];
+const STORES = [
+  'movements',
+  'categories',
+  'settings',
+  'projections'
+];
 
 function validateStore(store) {
   if (!STORES.includes(store)) {
@@ -22,7 +27,9 @@ export const db = {
   async getAll(store) {
     validateStore(store);
 
-    const snapshot = await getDocs(collection(firestore, store));
+    const snapshot = await getDocs(
+      collection(firestore, store)
+    );
 
     return snapshot.docs.map((document) => ({
       id: document.id,
@@ -33,7 +40,9 @@ export const db = {
   async get(store, id) {
     validateStore(store);
 
-    const snapshot = await getDoc(doc(firestore, store, id));
+    const snapshot = await getDoc(
+      doc(firestore, store, id)
+    );
 
     if (!snapshot.exists()) {
       return undefined;
@@ -54,7 +63,10 @@ export const db = {
 
     const { id, ...data } = value;
 
-    await setDoc(doc(firestore, store, id), data);
+    await setDoc(
+      doc(firestore, store, id),
+      data
+    );
 
     return value;
   },
@@ -62,13 +74,18 @@ export const db = {
   async delete(store, id) {
     validateStore(store);
 
-    await deleteDoc(doc(firestore, store, id));
+    await deleteDoc(
+      doc(firestore, store, id)
+    );
   },
 
   async clear(store) {
     validateStore(store);
 
-    const snapshot = await getDocs(collection(firestore, store));
+    const snapshot = await getDocs(
+      collection(firestore, store)
+    );
+
     const batch = writeBatch(firestore);
 
     snapshot.docs.forEach((document) => {
@@ -88,18 +105,29 @@ export async function seedDatabase() {
       name: 'APC',
       color: '#172A46',
       subcategories: ['Cancha'],
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
     });
   }
 
-  const settings = await db.get('settings', 'general');
+  const settings = await db.get(
+    'settings',
+    'general'
+  );
 
   if (!settings) {
     await db.put('settings', {
       id: 'general',
       initialBalance: 0,
-      organizationName: 'Liga de Padel del Atlántico',
+      organizationName:
+        'Liga de Padel del Atlántico',
       currency: 'COP',
+
+      projectionTrafficLight: {
+        yellowDays: 15,
+        redDays: 0
+      },
+
       updatedAt: new Date().toISOString()
     });
   }
