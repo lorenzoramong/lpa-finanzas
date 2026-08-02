@@ -142,6 +142,61 @@ export default function App() {
     };
   }, [projections, totals.balance]);
 
+  const projectionStatusSummary = useMemo(() => {
+    const yellowDays =
+      settings?.projectionTrafficLight?.yellowDays ?? 15;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const summary = {
+      onTime: 0,
+      upcoming: 0,
+      overdue: 0,
+      completed: 0,
+      pendingIncomeCount: 0,
+      pendingExpenseCount: 0
+    };
+
+    projections.forEach((projection) => {
+      if (projection.status === 'completed') {
+        summary.completed += 1;
+        return;
+      }
+
+      if (projection.type === 'income') {
+        summary.pendingIncomeCount += 1;
+      }
+
+      if (projection.type === 'expense') {
+        summary.pendingExpenseCount += 1;
+      }
+
+      if (!projection.dueDate) {
+        summary.onTime += 1;
+        return;
+      }
+
+      const dueDate = new Date(
+        `${projection.dueDate}T00:00:00`
+      );
+
+      const daysRemaining = Math.ceil(
+        (dueDate.getTime() - today.getTime()) / 86400000
+      );
+
+      if (daysRemaining < 0) {
+        summary.overdue += 1;
+      } else if (daysRemaining <= yellowDays) {
+        summary.upcoming += 1;
+      } else {
+        summary.onTime += 1;
+      }
+    });
+
+    return summary;
+  }, [projections, settings]);
+
   const openNewMovement = (type = 'income') => {
     setEditing(null);
     setInitialType(type);
@@ -163,7 +218,6 @@ export default function App() {
 
       setEditing(null);
       await load();
-
       setTab('cashflow');
     } catch (error) {
       console.error('Error al guardar movimiento:', error);
@@ -521,10 +575,9 @@ export default function App() {
       <Home
         totals={totals}
         projectionTotals={projectionTotals}
+        projectionStatusSummary={projectionStatusSummary}
         projections={projections}
-        movements={movements}
         onNewMovement={openNewMovement}
-        goCashflow={() => setTab('cashflow')}
         goProjections={() => setTab('projections')}
       />
     ),
