@@ -51,6 +51,47 @@ function getTransactionMovementAmount(transaction) {
   return actualAmount;
 }
 
+export function calculateRegistrationAmounts({
+  registrationValue = 0,
+  discountType = 'fixed',
+  discountValue = 0
+} = {}) {
+  const originalAmount = Math.max(
+    0,
+    toNumber(registrationValue)
+  );
+
+  const rawDiscount = Math.max(
+    0,
+    toNumber(discountValue)
+  );
+
+  const discountAmount =
+    discountType === 'percentage'
+      ? Math.min(
+          originalAmount,
+          originalAmount *
+            (Math.min(rawDiscount, 100) / 100)
+        )
+      : Math.min(originalAmount, rawDiscount);
+
+  const finalAmount = Math.max(
+    0,
+    originalAmount - discountAmount
+  );
+
+  return {
+    registrationValue: originalAmount,
+    discountType:
+      discountType === 'percentage'
+        ? 'percentage'
+        : 'fixed',
+    discountValue: rawDiscount,
+    discountAmount,
+    finalAmount
+  };
+}
+
 function getRegistrationMovementAmount(registration) {
   const paidAmount = toNumber(
     registration?.paidAmount
@@ -58,6 +99,13 @@ function getRegistrationMovementAmount(registration) {
 
   if (paidAmount > 0) {
     return paidAmount;
+  }
+
+  if (
+    registration?.finalAmount !== undefined &&
+    registration?.finalAmount !== null
+  ) {
+    return toNumber(registration.finalAmount);
   }
 
   return toNumber(
@@ -532,13 +580,31 @@ export async function saveTournamentRegistration({
         registration?.pairName
     ),
 
-    registrationValue: toNumber(
-      registration?.registrationValue ??
-        tournament.registrationValue
+    ...calculateRegistrationAmounts({
+      registrationValue:
+        registration?.registrationValue ??
+        existingRegistration?.registrationValue ??
+        tournament.registrationValue,
+
+      discountType:
+        registration?.discountType ??
+        existingRegistration?.discountType ??
+        'fixed',
+
+      discountValue:
+        registration?.discountValue ??
+        existingRegistration?.discountValue ??
+        0
+    }),
+
+    discountReason: normalizeText(
+      registration?.discountReason ??
+        existingRegistration?.discountReason
     ),
 
     paidAmount: toNumber(
-      registration?.paidAmount
+      registration?.paidAmount ??
+        existingRegistration?.paidAmount
     ),
 
     paymentStatus:
@@ -557,7 +623,33 @@ export async function saveTournamentRegistration({
       '',
 
     notes: normalizeText(
-      registration?.notes
+      registration?.notes ??
+        existingRegistration?.notes
+    ),
+
+    internalNotes: normalizeText(
+      registration?.internalNotes ??
+        existingRegistration?.internalNotes
+    ),
+
+    deletedFromImport:
+      registration?.deletedFromImport ??
+      existingRegistration?.deletedFromImport ??
+      false,
+
+    isExcluded:
+      registration?.isExcluded ??
+      existingRegistration?.isExcluded ??
+      false,
+
+    deletedAt:
+      registration?.deletedAt ??
+      existingRegistration?.deletedAt ??
+      null,
+
+    deletedReason: normalizeText(
+      registration?.deletedReason ??
+        existingRegistration?.deletedReason
     ),
 
     createdAt:
@@ -573,8 +665,7 @@ export async function saveTournamentRegistration({
 
   if (shouldHaveMovement) {
     if (item.paidAmount <= 0) {
-      item.paidAmount =
-        item.registrationValue;
+      item.paidAmount = item.finalAmount;
     }
 
     const movement = await createOrUpdateMovement({
@@ -616,6 +707,7 @@ export async function changeRegistrationPaymentStatus({
         paymentStatus === 'paid'
           ? toNumber(
               registration.paidAmount ||
+                registration.finalAmount ||
                 registration.registrationValue ||
                 tournament.registrationValue
             )
@@ -625,7 +717,8 @@ export async function changeRegistrationPaymentStatus({
 }
 
 export async function removeTournamentRegistration(
-  registrationId
+  registrationId,
+  reason = ''
 ) {
   const registration = await db.get(
     'tournamentRegistrations',
@@ -640,10 +733,68 @@ export async function removeTournamentRegistration(
     registration.movementId
   );
 
+  /*
+   * Las inscripciones importadas no se eliminan físicamente.
+   * Se conservan como exclusiones para que no reaparezcan
+   * al sincronizar nuevamente el mismo Excel.
+   */
+  if (
+    registration.source === 'excel' ||
+    registration.registrationKey
+  ) {
+    const now = nowISO();
+
+    await db.put(
+      'tournamentRegistrations',
+      {
+        ...registration,
+        paymentStatus: 'cancelled',
+        movementId: null,
+        deletedFromImport: true,
+        isExcluded: true,
+        deletedAt: now,
+        deletedReason: normalizeText(reason),
+        updatedAt: now
+      }
+    );
+
+    return;
+  }
+
   await db.delete(
     'tournamentRegistrations',
     registrationId
   );
+}
+
+export async function restoreExcludedRegistration(
+  registrationId
+) {
+  const registration = await db.get(
+    'tournamentRegistrations',
+    registrationId
+  );
+
+  if (!registration) {
+    return null;
+  }
+
+  const restored = {
+    ...registration,
+    paymentStatus: 'review',
+    deletedFromImport: false,
+    isExcluded: false,
+    deletedAt: null,
+    deletedReason: '',
+    updatedAt: nowISO()
+  };
+
+  await db.put(
+    'tournamentRegistrations',
+    restored
+  );
+
+  return restored;
 }
 
 /* =========================================================
@@ -672,10 +823,31 @@ export async function saveImportedRegistration({
    * - paidAmount
    * - paymentDate
    * - movementId
+   * - registrationValue
+   * - discountType
+   * - discountValue
+   * - discountReason
+   * - finalAmount
+   * - deletedFromImport
    *
    * Los estados financieros se administran
    * exclusivamente desde LPA Finanzas.
    */
+
+  const importedAmounts =
+    calculateRegistrationAmounts({
+      registrationValue:
+        existingRegistration?.registrationValue ??
+        tournament.registrationValue,
+
+      discountType:
+        existingRegistration?.discountType ??
+        'fixed',
+
+      discountValue:
+        existingRegistration?.discountValue ??
+        0
+    });
 
   const importedData = {
     ...registration,
@@ -687,6 +859,11 @@ export async function saveImportedRegistration({
 
     tournamentId: tournament.id,
     tournamentName: tournament.name,
+
+    ...importedAmounts,
+
+    discountReason:
+      existingRegistration?.discountReason || '',
 
     paymentStatus:
       existingRegistration?.paymentStatus ||
@@ -700,6 +877,24 @@ export async function saveImportedRegistration({
 
     movementId:
       existingRegistration?.movementId || null,
+
+    notes:
+      existingRegistration?.notes || '',
+
+    internalNotes:
+      existingRegistration?.internalNotes || '',
+
+    deletedFromImport:
+      existingRegistration?.deletedFromImport === true,
+
+    isExcluded:
+      existingRegistration?.isExcluded === true,
+
+    deletedAt:
+      existingRegistration?.deletedAt || null,
+
+    deletedReason:
+      existingRegistration?.deletedReason || '',
 
     createdAt:
       existingRegistration?.createdAt ||
@@ -748,7 +943,9 @@ export function calculateTournamentFinancials({
     registrations.filter(
       (registration) =>
         registration.tournamentId ===
-        tournament.id
+          tournament.id &&
+        registration.deletedFromImport !== true &&
+        registration.isExcluded !== true
     );
 
   const incomeTransactions =
