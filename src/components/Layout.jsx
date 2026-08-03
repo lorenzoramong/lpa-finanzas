@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   PlusCircle,
   Settings,
+  Trophy,
   X
 } from 'lucide-react';
 
@@ -34,6 +35,13 @@ const centerOptions = [
     className: 'projections'
   },
   {
+    id: 'tournaments',
+    label: 'Torneos',
+    description: 'Control financiero, rentabilidad y audiencia',
+    icon: Trophy,
+    className: 'tournaments'
+  },
+  {
     id: 'stats',
     label: 'Estadísticas',
     description: 'Indicadores, filtros y gráficos financieros',
@@ -49,7 +57,9 @@ const centerOptions = [
   }
 ];
 
-const centerTabIds = centerOptions.map((option) => option.id);
+const centerTabIds = centerOptions.map(
+  (option) => option.id
+);
 
 export default function Layout({
   activeTab,
@@ -75,8 +85,14 @@ export default function Layout({
     document.body.classList.add('center-menu-open');
 
     return () => {
-      document.removeEventListener('keydown', closeWithEscape);
-      document.body.classList.remove('center-menu-open');
+      document.removeEventListener(
+        'keydown',
+        closeWithEscape
+      );
+
+      document.body.classList.remove(
+        'center-menu-open'
+      );
     };
   }, [centerOpen]);
 
@@ -109,7 +125,9 @@ export default function Layout({
             <button
               key={id}
               type="button"
-              className={activeTab === id ? 'active' : ''}
+              className={
+                activeTab === id ? 'active' : ''
+              }
               onClick={() => navigateTo(id)}
             >
               <Icon size={20} />
@@ -120,7 +138,9 @@ export default function Layout({
           <button
             type="button"
             className={`sidebar-center-btn ${
-              centerIsActive || centerOpen ? 'active' : ''
+              centerIsActive || centerOpen
+                ? 'active'
+                : ''
             }`}
             onClick={() => setCenterOpen(true)}
           >
@@ -155,7 +175,9 @@ export default function Layout({
       >
         <button
           type="button"
-          className={activeTab === 'dashboard' ? 'active' : ''}
+          className={
+            activeTab === 'dashboard' ? 'active' : ''
+          }
           onClick={() => navigateTo('dashboard')}
         >
           <Home size={20} />
@@ -164,7 +186,9 @@ export default function Layout({
 
         <button
           type="button"
-          className={activeTab === 'cashflow' ? 'active' : ''}
+          className={
+            activeTab === 'cashflow' ? 'active' : ''
+          }
           onClick={() => navigateTo('cashflow')}
         >
           <Landmark size={20} />
@@ -173,7 +197,9 @@ export default function Layout({
 
         <button
           type="button"
-          className={activeTab === 'movements' ? 'active' : ''}
+          className={
+            activeTab === 'movements' ? 'active' : ''
+          }
           onClick={() => navigateTo('movements')}
         >
           <PlusCircle size={20} />
@@ -182,7 +208,11 @@ export default function Layout({
 
         <button
           type="button"
-          className={centerIsActive || centerOpen ? 'active' : ''}
+          className={
+            centerIsActive || centerOpen
+              ? 'active'
+              : ''
+          }
           onClick={() => setCenterOpen(true)}
         >
           <LayoutGrid size={20} />
@@ -210,9 +240,17 @@ export default function Layout({
 
             <div className="center-sheet-header">
               <div>
-                <p className="eyebrow">Navegación</p>
-                <h2 id="center-title">Centro financiero</h2>
-                <span>Herramientas y módulos de LPA Finanzas</span>
+                <p className="eyebrow">
+                  Navegación
+                </p>
+
+                <h2 id="center-title">
+                  Centro financiero
+                </h2>
+
+                <span>
+                  Herramientas y módulos de LPA Finanzas
+                </span>
               </div>
 
               <button
@@ -233,18 +271,29 @@ export default function Layout({
                   <button
                     key={option.id}
                     type="button"
-                    className={`center-option ${option.className} ${
-                      activeTab === option.id ? 'selected' : ''
+                    className={`center-option ${
+                      option.className
+                    } ${
+                      activeTab === option.id
+                        ? 'selected'
+                        : ''
                     }`}
-                    onClick={() => navigateTo(option.id)}
+                    onClick={() =>
+                      navigateTo(option.id)
+                    }
                   >
                     <span className="center-option-icon">
                       <Icon size={22} />
                     </span>
 
                     <span className="center-option-copy">
-                      <strong>{option.label}</strong>
-                      <small>{option.description}</small>
+                      <strong>
+                        {option.label}
+                      </strong>
+
+                      <small>
+                        {option.description}
+                      </small>
                     </span>
 
                     <ChevronRight
