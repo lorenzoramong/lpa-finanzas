@@ -11,7 +11,6 @@ import {
   Search,
   Trash2,
   Trophy,
-  Upload,
   Users,
   Wallet
 } from 'lucide-react';
@@ -21,6 +20,7 @@ import { formatCurrency } from '../lib/format';
 import TournamentForm from '../components/tournaments/TournamentForm';
 import TournamentModal from '../components/tournaments/TournamentModal';
 import TransactionForm from '../components/tournaments/TransactionForm';
+import TournamentSync from '../components/tournaments/TournamentSync';
 
 const EMPTY_TOURNAMENT_FORM = {
   name: '',
@@ -174,7 +174,8 @@ export default function Tournaments({
   onDeleteTransaction,
   onSaveRegistration,
   onChangeRegistrationStatus,
-  onDeleteRegistration
+  onDeleteRegistration,
+  onImportRegistrations
 }) {
   const [mainView, setMainView] = useState('tournaments');
   const [tournamentTab, setTournamentTab] = useState('summary');
@@ -1598,64 +1599,11 @@ export default function Tournaments({
         )}
 
         {tournamentTab === 'sync' && (
-          <section className="panel tournament-sync-panel">
-            <div className="tournament-sync-box">
-              <Upload size={38} />
-
-              <h2>Sincronizar inscripciones</h2>
-
-              <p>
-                La importación actualizará parejas, jugadores,
-                categorías y estadísticas. Nunca modificará el
-                estado financiero ni los pagos registrados
-                manualmente.
-              </p>
-
-              <button
-                type="button"
-                className="primary-btn"
-                disabled
-              >
-                <Upload size={18} />
-                Importar Excel
-              </button>
-
-              <small>
-                El importador se conectará en la siguiente fase.
-              </small>
-            </div>
-
-            {!!imports.filter(
-              (item) =>
-                item.tournamentId ===
-                selectedTournament.id
-            ).length && (
-              <div className="tournament-import-history">
-                <h3>Historial de sincronización</h3>
-
-                {imports
-                  .filter(
-                    (item) =>
-                      item.tournamentId ===
-                      selectedTournament.id
-                  )
-                  .map((item) => (
-                    <article key={item.id}>
-                      <strong>
-                        {item.fileName ||
-                          'Archivo importado'}
-                      </strong>
-
-                      <span>
-                        {item.created || 0} nuevas ·{' '}
-                        {item.updated || 0} actualizadas ·{' '}
-                        {item.unchanged || 0} sin cambios
-                      </span>
-                    </article>
-                  ))}
-              </div>
-            )}
-          </section>
+          <TournamentSync
+            tournament={selectedTournament}
+            imports={imports}
+            onConfirmImport={onImportRegistrations}
+          />
         )}
 
         {showTournamentForm && (
