@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Trophy } from 'lucide-react';
 
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -7,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Movements from './pages/Movements';
 import History from './pages/History';
 import Projections from './pages/Projections';
+import Tournaments from './pages/Tournaments';
 import Stats from './pages/Stats';
 import Settings from './pages/Settings';
 
@@ -980,51 +980,40 @@ export default function App() {
     ),
 
     tournaments: (
-      <div className="page">
-        <div className="page-title">
-          <p className="eyebrow">
-            Gestión financiera por evento
-          </p>
-
-          <h1>Torneos</h1>
-
-          <p>
-            Presupuesto, recaudo, rentabilidad y estadísticas
-            comerciales.
-          </p>
-        </div>
-
-        <section className="panel empty-state">
-          <Trophy size={48} />
-
-          <h2>Módulo conectado</h2>
-
-          <p>
-            Firebase y la sincronización con el flujo de caja ya
-            están preparados. El siguiente paso es crear la
-            interfaz completa de Torneos.
-          </p>
-
-          <p>
-            Torneos registrados: {tournaments.length}
-          </p>
-
-          <p>
-            Utilidad real acumulada:{' '}
-            {new Intl.NumberFormat('es-CO', {
-              style: 'currency',
-              currency: 'COP',
-              maximumFractionDigits: 0
-            }).format(tournamentSummary.realUtility)}
-          </p>
-
-          {selectedTournament && (
-            <p>
-              Torneo seleccionado: {selectedTournament.name}
-            </p>
-          )}
-        </section>
-      </div>
+      <Tournaments
+        tournaments={tournaments}
+        transactions={tournamentTransactions}
+        registrations={tournamentRegistrations}
+        players={tournamentPlayers}
+        imports={tournamentImports}
+        financials={tournamentFinancials}
+        summary={tournamentSummary}
+        selectedTournament={selectedTournament}
+        onSelectTournament={setSelectedTournamentId}
+        onCloseTournament={() =>
+          setSelectedTournamentId(null)
+        }
+        onSaveTournament={handleSaveTournament}
+        onDeleteTournament={handleDeleteTournament}
+        onSaveTransaction={
+          handleSaveTournamentTransaction
+        }
+        onChangeTransactionStatus={
+          handleChangeTournamentTransactionStatus
+        }
+        onDeleteTransaction={
+          handleDeleteTournamentTransaction
+        }
+        onSaveRegistration={
+          handleSaveTournamentRegistration
+        }
+        onChangeRegistrationStatus={
+          handleChangeRegistrationPaymentStatus
+        }
+        onDeleteRegistration={
+          handleDeleteTournamentRegistration
+        }
+      />
     ),
 
     stats: (
