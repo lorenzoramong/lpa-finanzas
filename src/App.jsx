@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Trophy } from 'lucide-react';
 
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -11,11 +12,34 @@ import Settings from './pages/Settings';
 
 import { db, seedDatabase } from './lib/db';
 
+import {
+  calculateTournamentFinancials,
+  changeRegistrationPaymentStatus,
+  changeTournamentTransactionStatus,
+  loadTournamentModule,
+  removeTournamentRecord,
+  removeTournamentRegistration,
+  removeTournamentTransaction,
+  saveTournamentRecord,
+  saveTournamentRegistration,
+  saveTournamentTransaction
+} from './lib/tournaments';
+
 export default function App() {
   const [tab, setTab] = useState('dashboard');
   const [movements, setMovements] = useState([]);
   const [categories, setCategories] = useState([]);
   const [projections, setProjections] = useState([]);
+
+  const [tournaments, setTournaments] = useState([]);
+  const [tournamentTransactions, setTournamentTransactions] =
+    useState([]);
+  const [tournamentRegistrations, setTournamentRegistrations] =
+    useState([]);
+  const [tournamentPlayers, setTournamentPlayers] = useState([]);
+  const [tournamentImports, setTournamentImports] = useState([]);
+  const [selectedTournamentId, setSelectedTournamentId] =
+    useState(null);
 
   const [settings, setSettings] = useState({
     initialBalance: 0,
@@ -37,17 +61,29 @@ export default function App() {
         movementData,
         categoryData,
         projectionData,
-        settingsData
+        settingsData,
+        tournamentData
       ] = await Promise.all([
         db.getAll('movements'),
         db.getAll('categories'),
         db.getAll('projections'),
-        db.get('settings', 'general')
+        db.get('settings', 'general'),
+        loadTournamentModule()
       ]);
 
       setMovements(movementData || []);
       setCategories(categoryData || []);
       setProjections(projectionData || []);
+
+      setTournaments(tournamentData.tournaments || []);
+      setTournamentTransactions(
+        tournamentData.transactions || []
+      );
+      setTournamentRegistrations(
+        tournamentData.registrations || []
+      );
+      setTournamentPlayers(tournamentData.players || []);
+      setTournamentImports(tournamentData.imports || []);
 
       setSettings(
         settingsData || {
@@ -196,6 +232,76 @@ export default function App() {
 
     return summary;
   }, [projections, settings]);
+
+  const selectedTournament = useMemo(
+    () =>
+      tournaments.find(
+        (tournament) => tournament.id === selectedTournamentId
+      ) || null,
+    [tournaments, selectedTournamentId]
+  );
+
+  const tournamentFinancials = useMemo(() => {
+    return tournaments.reduce((result, tournament) => {
+      result[tournament.id] = calculateTournamentFinancials({
+        tournament,
+        transactions: tournamentTransactions,
+        registrations: tournamentRegistrations
+      });
+
+      return result;
+    }, {});
+  }, [
+    tournaments,
+    tournamentTransactions,
+    tournamentRegistrations
+  ]);
+
+  const tournamentSummary = useMemo(() => {
+    return tournaments.reduce(
+      (summary, tournament) => {
+        const financials =
+          tournamentFinancials[tournament.id] || {};
+
+        summary.projectedIncome += Number(
+          financials.projectedIncome || 0
+        );
+        summary.realIncome += Number(
+          financials.realIncome || 0
+        );
+        summary.projectedExpenses += Number(
+          financials.projectedExpenses || 0
+        );
+        summary.realExpenses += Number(
+          financials.realExpenses || 0
+        );
+        summary.projectedUtility += Number(
+          financials.projectedUtility || 0
+        );
+        summary.realUtility += Number(
+          financials.realUtility || 0
+        );
+        summary.totalPairs += Number(
+          financials.totalPairs || 0
+        );
+        summary.totalPlayers += Number(
+          financials.totalPlayers || 0
+        );
+
+        return summary;
+      },
+      {
+        projectedIncome: 0,
+        realIncome: 0,
+        projectedExpenses: 0,
+        realExpenses: 0,
+        projectedUtility: 0,
+        realUtility: 0,
+        totalPairs: 0,
+        totalPlayers: 0
+      }
+    );
+  }, [tournaments, tournamentFinancials]);
 
   const openNewMovement = (type = 'income') => {
     setEditing(null);
@@ -398,6 +504,213 @@ export default function App() {
     }
   };
 
+  const handleSaveTournament = async (tournamentData) => {
+    try {
+      const savedTournament =
+        await saveTournamentRecord(tournamentData);
+
+      setSelectedTournamentId(savedTournament.id);
+      await load();
+
+      return savedTournament;
+    } catch (error) {
+      console.error('Error al guardar torneo:', error);
+      alert(
+        error.message || 'No fue posible guardar el torneo.'
+      );
+      return null;
+    }
+  };
+
+  const handleDeleteTournament = async (tournamentId) => {
+    const tournament = tournaments.find(
+      (item) => item.id === tournamentId
+    );
+
+    const confirmed = confirm(
+      `¿Eliminar ${
+        tournament?.name || 'este torneo'
+      }?\n\nTambién se eliminarán sus inscripciones, ingresos, egresos y todos los movimientos relacionados del flujo de caja.`
+    );
+
+    if (!confirmed) {
+      return false;
+    }
+
+    try {
+      await removeTournamentRecord(tournamentId);
+
+      if (selectedTournamentId === tournamentId) {
+        setSelectedTournamentId(null);
+      }
+
+      await load();
+      return true;
+    } catch (error) {
+      console.error('Error al eliminar torneo:', error);
+      alert('No fue posible eliminar el torneo.');
+      return false;
+    }
+  };
+
+  const handleSaveTournamentTransaction = async ({
+    transaction,
+    tournament
+  }) => {
+    try {
+      const savedTransaction =
+        await saveTournamentTransaction({
+          transaction,
+          tournament
+        });
+
+      await load();
+      return savedTransaction;
+    } catch (error) {
+      console.error(
+        'Error al guardar ingreso o egreso:',
+        error
+      );
+      alert(
+        error.message ||
+          'No fue posible guardar el registro financiero.'
+      );
+      return null;
+    }
+  };
+
+  const handleChangeTournamentTransactionStatus = async ({
+    transaction,
+    tournament,
+    status
+  }) => {
+    try {
+      const savedTransaction =
+        await changeTournamentTransactionStatus({
+          transaction,
+          tournament,
+          status
+        });
+
+      await load();
+      return savedTransaction;
+    } catch (error) {
+      console.error(
+        'Error al cambiar el estado financiero:',
+        error
+      );
+      alert(
+        error.message ||
+          'No fue posible cambiar el estado.'
+      );
+      return null;
+    }
+  };
+
+  const handleDeleteTournamentTransaction = async (
+    transactionId
+  ) => {
+    const confirmed = confirm(
+      '¿Eliminar este registro financiero?\n\nSi ya generó un movimiento, también se eliminará del flujo de caja.'
+    );
+
+    if (!confirmed) {
+      return false;
+    }
+
+    try {
+      await removeTournamentTransaction(transactionId);
+      await load();
+      return true;
+    } catch (error) {
+      console.error(
+        'Error al eliminar ingreso o egreso:',
+        error
+      );
+      alert('No fue posible eliminar el registro financiero.');
+      return false;
+    }
+  };
+
+  const handleSaveTournamentRegistration = async ({
+    registration,
+    tournament
+  }) => {
+    try {
+      const savedRegistration =
+        await saveTournamentRegistration({
+          registration,
+          tournament
+        });
+
+      await load();
+      return savedRegistration;
+    } catch (error) {
+      console.error(
+        'Error al guardar inscripción:',
+        error
+      );
+      alert(
+        error.message ||
+          'No fue posible guardar la inscripción.'
+      );
+      return null;
+    }
+  };
+
+  const handleChangeRegistrationPaymentStatus = async ({
+    registration,
+    tournament,
+    paymentStatus
+  }) => {
+    try {
+      const savedRegistration =
+        await changeRegistrationPaymentStatus({
+          registration,
+          tournament,
+          paymentStatus
+        });
+
+      await load();
+      return savedRegistration;
+    } catch (error) {
+      console.error(
+        'Error al cambiar el estado de la inscripción:',
+        error
+      );
+      alert(
+        error.message ||
+          'No fue posible cambiar el estado de pago.'
+      );
+      return null;
+    }
+  };
+
+  const handleDeleteTournamentRegistration = async (
+    registrationId
+  ) => {
+    const confirmed = confirm(
+      '¿Eliminar esta inscripción?\n\nSi ya generó un ingreso, también se eliminará del flujo de caja.'
+    );
+
+    if (!confirmed) {
+      return false;
+    }
+
+    try {
+      await removeTournamentRegistration(registrationId);
+      await load();
+      return true;
+    } catch (error) {
+      console.error(
+        'Error al eliminar inscripción:',
+        error
+      );
+      alert('No fue posible eliminar la inscripción.');
+      return false;
+    }
+  };
+
   const addCategory = async (category) => {
     try {
       await db.put('categories', {
@@ -478,12 +791,17 @@ export default function App() {
 
   const backup = () => {
     const backupData = {
-      version: 2,
+      version: 3,
       exportedAt: new Date().toISOString(),
       settings,
       categories,
       movements,
-      projections
+      projections,
+      tournaments,
+      tournamentTransactions,
+      tournamentRegistrations,
+      players: tournamentPlayers,
+      tournamentImports
     };
 
     const blob = new Blob(
@@ -526,7 +844,12 @@ export default function App() {
         'movements',
         'categories',
         'settings',
-        'projections'
+        'projections',
+        'tournaments',
+        'tournamentRegistrations',
+        'tournamentTransactions',
+        'players',
+        'tournamentImports'
       ]) {
         await db.clear(store);
       }
@@ -543,12 +866,45 @@ export default function App() {
         await db.put('projections', projection);
       }
 
+      for (const tournament of data.tournaments || []) {
+        await db.put('tournaments', tournament);
+      }
+
+      for (const registration of
+        data.tournamentRegistrations || []) {
+        await db.put(
+          'tournamentRegistrations',
+          registration
+        );
+      }
+
+      for (const transaction of
+        data.tournamentTransactions || []) {
+        await db.put(
+          'tournamentTransactions',
+          transaction
+        );
+      }
+
+      for (const player of data.players || []) {
+        await db.put('players', player);
+      }
+
+      for (const importSession of
+        data.tournamentImports || []) {
+        await db.put(
+          'tournamentImports',
+          importSession
+        );
+      }
+
       await db.put('settings', {
         ...(data.settings || {}),
         id: 'general',
         updatedAt: new Date().toISOString()
       });
 
+      setSelectedTournamentId(null);
       await load();
       alert('Respaldo restaurado.');
     } catch (error) {
@@ -621,6 +977,54 @@ export default function App() {
         onDelete={deleteProjection}
         onComplete={completeProjection}
       />
+    ),
+
+    tournaments: (
+      <div className="page">
+        <div className="page-title">
+          <p className="eyebrow">
+            Gestión financiera por evento
+          </p>
+
+          <h1>Torneos</h1>
+
+          <p>
+            Presupuesto, recaudo, rentabilidad y estadísticas
+            comerciales.
+          </p>
+        </div>
+
+        <section className="panel empty-state">
+          <Trophy size={48} />
+
+          <h2>Módulo conectado</h2>
+
+          <p>
+            Firebase y la sincronización con el flujo de caja ya
+            están preparados. El siguiente paso es crear la
+            interfaz completa de Torneos.
+          </p>
+
+          <p>
+            Torneos registrados: {tournaments.length}
+          </p>
+
+          <p>
+            Utilidad real acumulada:{' '}
+            {new Intl.NumberFormat('es-CO', {
+              style: 'currency',
+              currency: 'COP',
+              maximumFractionDigits: 0
+            }).format(tournamentSummary.realUtility)}
+          </p>
+
+          {selectedTournament && (
+            <p>
+              Torneo seleccionado: {selectedTournament.name}
+            </p>
+          )}
+        </section>
+      </div>
     ),
 
     stats: (
