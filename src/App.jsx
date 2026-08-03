@@ -13,6 +13,10 @@ import Settings from './pages/Settings';
 import { db, seedDatabase } from './lib/db';
 
 import {
+  prepareImportedRegistrationForSave
+} from './lib/tournamentImport';
+
+import {
   calculateTournamentFinancials,
   changeRegistrationPaymentStatus,
   changeTournamentTransactionStatus,
@@ -24,6 +28,31 @@ import {
   saveTournamentRegistration,
   saveTournamentTransaction
 } from './lib/tournaments';
+
+function normalizePlayerIdentifier(player) {
+  return String(
+    player?.email ||
+      player?.phone ||
+      player?.document ||
+      player?.name ||
+      ''
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function createStableId(value) {
+  const text = String(value || '');
+  let hash = 2166136261;
+
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return `player_${(hash >>> 0).toString(36)}`;
+}
+
 
 export default function App() {
   const [tab, setTab] = useState('dashboard');
@@ -711,6 +740,172 @@ export default function App() {
     }
   };
 
+  const handleImportTournamentRegistrations = async ({
+    tournament,
+    readResult,
+    comparison
+  }) => {
+    if (!tournament?.id) {
+      throw new Error(
+        'No fue posible identificar el torneo.'
+      );
+    }
+
+    const now = new Date().toISOString();
+
+    const playerMap = new Map(
+      tournamentPlayers.map((player) => [
+        normalizePlayerIdentifier(player),
+        player
+      ])
+    );
+
+    const upsertPlayer = async (
+      playerData,
+      registrationId
+    ) => {
+      const identifier =
+        normalizePlayerIdentifier(playerData);
+
+      if (!identifier) {
+        return;
+      }
+
+      const existing = playerMap.get(identifier);
+
+      const tournamentIds = Array.from(
+        new Set([
+          ...(existing?.tournamentIds || []),
+          tournament.id
+        ])
+      );
+
+      const registrationIds = Array.from(
+        new Set([
+          ...(existing?.registrationIds || []),
+          registrationId
+        ])
+      );
+
+      const player = {
+        ...existing,
+        ...playerData,
+
+        id:
+          existing?.id ||
+          createStableId(identifier),
+
+        normalizedIdentifier: identifier,
+
+        tournamentIds,
+        registrationIds,
+
+        firstSeenAt:
+          existing?.firstSeenAt || now,
+
+        lastSeenAt: now,
+        updatedAt: now
+      };
+
+      await db.put('players', player);
+      playerMap.set(identifier, player);
+    };
+
+    let created = 0;
+    let updated = 0;
+
+    const recordsToSave = [
+      ...comparison.newRegistrations.map(
+        (imported) => ({
+          imported,
+          existing: null,
+          operation: 'created'
+        })
+      ),
+
+      ...comparison.updatedRegistrations.map(
+        ({ imported, existing }) => ({
+          imported,
+          existing,
+          operation: 'updated'
+        })
+      )
+    ];
+
+    for (const record of recordsToSave) {
+      const preparedRegistration =
+        prepareImportedRegistrationForSave({
+          imported: record.imported,
+          existing: record.existing,
+          tournament
+        });
+
+      await db.put(
+        'tournamentRegistrations',
+        preparedRegistration
+      );
+
+      await upsertPlayer(
+        preparedRegistration.player1,
+        preparedRegistration.id
+      );
+
+      await upsertPlayer(
+        preparedRegistration.player2,
+        preparedRegistration.id
+      );
+
+      if (record.operation === 'created') {
+        created += 1;
+      } else {
+        updated += 1;
+      }
+    }
+
+    const importRecord = {
+      id: crypto.randomUUID(),
+
+      tournamentId: tournament.id,
+      tournamentName: tournament.name,
+
+      fileName: readResult.fileName,
+      sheetName: readResult.sheetName,
+
+      totalRows: readResult.totalRows,
+      validRows: readResult.validRows,
+
+      created,
+      updated,
+
+      unchanged:
+        comparison.counts.unchanged,
+
+      excluded:
+        comparison.counts.excluded,
+
+      review:
+        comparison.counts.review,
+
+      invalid:
+        readResult.invalidRows.length,
+
+      duplicates:
+        readResult.duplicateKeys.length,
+
+      createdAt: now,
+      updatedAt: now
+    };
+
+    await db.put(
+      'tournamentImports',
+      importRecord
+    );
+
+    await load();
+
+    return importRecord;
+  };
+
   const addCategory = async (category) => {
     try {
       await db.put('categories', {
@@ -1013,6 +1208,9 @@ export default function App() {
         onDeleteRegistration={
           handleDeleteTournamentRegistration
         }
+        onImportRegistrations={
+          handleImportTournamentRegistrations
+        }
       />
     ),
 
@@ -1046,3 +1244,5 @@ export default function App() {
     </Layout>
   );
 }
+
+
