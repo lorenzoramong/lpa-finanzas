@@ -922,52 +922,54 @@ export async function compareTournamentImport({
    PREPARACIÓN PARA GUARDAR
    ========================================================= */
 
-function preserveFinancialFields(existing = {}) {
+function preserveFinancialFields(existing) {
+  const safeExisting = existing || {};
+
   return {
     paymentStatus:
-      existing.paymentStatus || 'review',
+      safeExisting.paymentStatus || 'review',
 
     paymentDate:
-      existing.paymentDate || '',
+      safeExisting.paymentDate || '',
 
     paidAmount:
-      Number(existing.paidAmount || 0),
+      Number(safeExisting.paidAmount || 0),
 
     registrationValue:
-      Number(existing.registrationValue || 0),
+      Number(safeExisting.registrationValue || 0),
 
     discountType:
-      existing.discountType || 'fixed',
+      safeExisting.discountType || 'fixed',
 
     discountValue:
-      Number(existing.discountValue || 0),
+      Number(safeExisting.discountValue || 0),
 
     discountAmount:
-      Number(existing.discountAmount || 0),
+      Number(safeExisting.discountAmount || 0),
 
     discountReason:
-      existing.discountReason || '',
+      safeExisting.discountReason || '',
 
     finalAmount:
-      Number(existing.finalAmount || 0),
+      Number(safeExisting.finalAmount || 0),
 
     movementId:
-      existing.movementId || null,
+      safeExisting.movementId || null,
 
     notes:
-      existing.notes || '',
+      safeExisting.notes || '',
 
     internalNotes:
-      existing.internalNotes || '',
+      safeExisting.internalNotes || '',
 
     deletedFromImport:
-      existing.deletedFromImport === true,
+      safeExisting.deletedFromImport === true,
 
     deletedAt:
-      existing.deletedAt || null,
+      safeExisting.deletedAt || null,
 
     deletedReason:
-      existing.deletedReason || ''
+      safeExisting.deletedReason || ''
   };
 }
 
