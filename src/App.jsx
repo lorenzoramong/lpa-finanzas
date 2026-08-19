@@ -14,6 +14,7 @@ import Settings from './pages/Settings';
 import { db, seedDatabase } from './lib/db';
 
 import {
+  addAcademyPaymentInstallment,
   changeAcademyPaymentStatus,
   ensureAcademyCyclePayments,
   ensureCurrentAcademyCycle,
@@ -1224,6 +1225,39 @@ export default function App() {
     }
   };
 
+  const handleAddAcademyPaymentInstallment = async ({
+    payment,
+    amount,
+    date,
+    notes
+  }) => {
+    try {
+      const saved =
+        await addAcademyPaymentInstallment({
+          payment,
+          amount,
+          date,
+          notes
+        });
+
+      await load();
+
+      return saved;
+    } catch (error) {
+      console.error(
+        'Error al registrar abono de academia:',
+        error
+      );
+
+      alert(
+        error.message ||
+          'No fue posible registrar el abono.'
+      );
+
+      return null;
+    }
+  };
+
   const handleChangeAcademyPaymentStatus = async ({
     payment,
     status
@@ -1698,6 +1732,9 @@ export default function App() {
         onUpdatePayment={
           handleUpdateAcademyPayment
         }
+        onAddPaymentInstallment={
+          handleAddAcademyPaymentInstallment
+        }
       />
     ),
 
@@ -1731,4 +1768,3 @@ export default function App() {
     </Layout>
   );
 }
-
