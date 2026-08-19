@@ -3,6 +3,7 @@ import {
   BarChart3,
   CalendarClock,
   ChevronRight,
+  GraduationCap,
   History,
   Home,
   Landmark,
@@ -40,6 +41,13 @@ const centerOptions = [
     description: 'Control financiero, rentabilidad y audiencia',
     icon: Trophy,
     className: 'tournaments'
+  },
+  {
+    id: 'academy',
+    label: 'Academia',
+    description: 'Cuotas, entrenadores y ciclos mensuales',
+    icon: GraduationCap,
+    className: 'academy'
   },
   {
     id: 'stats',
