@@ -14,8 +14,11 @@ import Settings from './pages/Settings';
 import { db, seedDatabase } from './lib/db';
 
 import {
+  changeAcademyPaymentStatus,
+  ensureAcademyCyclePayments,
   ensureCurrentAcademyCycle,
-  saveAcademyCycleSettings
+  saveAcademyCycleSettings,
+  updateAcademyPayment
 } from './lib/academy';
 
 import {
@@ -80,6 +83,7 @@ export default function App() {
   const [academyCoaches, setAcademyCoaches] = useState([]);
   const [academyPlayers, setAcademyPlayers] = useState([]);
   const [academyCycles, setAcademyCycles] = useState([]);
+  const [academyPayments, setAcademyPayments] = useState([]);
   const [academySettings, setAcademySettings] = useState(null);
 
   const [settings, setSettings] = useState({
@@ -132,9 +136,36 @@ export default function App() {
       const refreshedAcademyCycles =
         await db.getAll('academyCycles');
 
-      setMovements(movementData || []);
+      const existingAcademyPayments =
+        await db.getAll('academyPayments');
+
+      await ensureAcademyCyclePayments({
+        cycles: refreshedAcademyCycles || [],
+        payments: existingAcademyPayments || []
+      });
+
+      const refreshedAcademyPayments =
+        await db.getAll('academyPayments');
+
+      /*
+       * ensureAcademyCyclePayments puede crear/actualizar
+       * proyecciones. Recargamos movimientos y proyecciones
+       * para que Inicio, Proyecciones y Flujo queden en sintonía.
+       */
+      const [
+        refreshedMovements,
+        refreshedProjections
+      ] = await Promise.all([
+        db.getAll('movements'),
+        db.getAll('projections')
+      ]);
+
+      setMovements(refreshedMovements || []);
+
       setCategories(categoryData || []);
-      setProjections(projectionData || []);
+      setProjections(
+        refreshedProjections || []
+      );
 
       setTournaments(tournamentData.tournaments || []);
       setTournamentTransactions(
@@ -151,6 +182,9 @@ export default function App() {
       setAcademyPlayers(academyPlayerData || []);
       setAcademyCycles(
         refreshedAcademyCycles || []
+      );
+      setAcademyPayments(
+        refreshedAcademyPayments || []
       );
       setAcademySettings(
         settingsData?.academySettings || {
@@ -1151,6 +1185,66 @@ export default function App() {
     }
   };
 
+  const handleChangeAcademyPaymentStatus = async ({
+    payment,
+    status
+  }) => {
+    try {
+      const saved =
+        await changeAcademyPaymentStatus({
+          payment,
+          status
+        });
+
+      await load();
+
+      return saved;
+    } catch (error) {
+      console.error(
+        'Error al cambiar estado del pago de academia:',
+        error
+      );
+
+      alert(
+        error.message ||
+          'No fue posible cambiar el estado del pago.'
+      );
+
+      return null;
+    }
+  };
+
+  const handleUpdateAcademyPayment = async ({
+    payment,
+    amount,
+    notes
+  }) => {
+    try {
+      const saved =
+        await updateAcademyPayment({
+          payment,
+          amount,
+          notes
+        });
+
+      await load();
+
+      return saved;
+    } catch (error) {
+      console.error(
+        'Error al actualizar pago de academia:',
+        error
+      );
+
+      alert(
+        error.message ||
+          'No fue posible actualizar el pago.'
+      );
+
+      return null;
+    }
+  };
+
   const handleSaveAcademyCycleSettings = async ({
     cycleStartDay,
     cycleEndDay
@@ -1276,7 +1370,12 @@ export default function App() {
       tournamentTransactions,
       tournamentRegistrations,
       players: tournamentPlayers,
-      tournamentImports
+      tournamentImports,
+      academyLocations,
+      academyCoaches,
+      academyPlayers,
+      academyCycles,
+      academyPayments
     };
 
     const blob = new Blob(
@@ -1324,7 +1423,12 @@ export default function App() {
         'tournamentRegistrations',
         'tournamentTransactions',
         'players',
-        'tournamentImports'
+        'tournamentImports',
+        'academyLocations',
+        'academyCoaches',
+        'academyPlayers',
+        'academyCycles',
+        'academyPayments'
       ]) {
         await db.clear(store);
       }
@@ -1370,6 +1474,46 @@ export default function App() {
         await db.put(
           'tournamentImports',
           importSession
+        );
+      }
+
+      for (const location of
+        data.academyLocations || []) {
+        await db.put(
+          'academyLocations',
+          location
+        );
+      }
+
+      for (const coach of
+        data.academyCoaches || []) {
+        await db.put(
+          'academyCoaches',
+          coach
+        );
+      }
+
+      for (const player of
+        data.academyPlayers || []) {
+        await db.put(
+          'academyPlayers',
+          player
+        );
+      }
+
+      for (const cycle of
+        data.academyCycles || []) {
+        await db.put(
+          'academyCycles',
+          cycle
+        );
+      }
+
+      for (const payment of
+        data.academyPayments || []) {
+        await db.put(
+          'academyPayments',
+          payment
         );
       }
 
@@ -1506,6 +1650,13 @@ export default function App() {
         onTogglePlayer={handleToggleAcademyPlayer}
         onSaveCycleSettings={
           handleSaveAcademyCycleSettings
+        }
+        payments={academyPayments}
+        onChangePaymentStatus={
+          handleChangeAcademyPaymentStatus
+        }
+        onUpdatePayment={
+          handleUpdateAcademyPayment
         }
       />
     ),
