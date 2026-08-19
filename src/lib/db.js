@@ -25,7 +25,61 @@ const STORES = [
   'tournamentRegistrations',
   'tournamentTransactions',
   'players',
-  'tournamentImports'
+  'tournamentImports',
+
+  // Módulo financiero de Academia
+  'academyLocations',
+  'academyCoaches',
+  'academyPlayers',
+  'academyCycles',
+  'academyPayments'
+];
+
+/* =========================================================
+   CONFIGURACIÓN BASE DE ACADEMIA
+   ========================================================= */
+
+export const DEFAULT_ACADEMY_LOCATIONS = [
+  {
+    id: 'ace-padel',
+    name: 'Ace Padel',
+    isActive: true
+  },
+  {
+    id: 'padel-park',
+    name: 'Padel Park',
+    isActive: true
+  }
+];
+
+export const ACADEMY_PLAYER_STATUSES = [
+  {
+    key: 'active',
+    label: 'Activo'
+  },
+  {
+    key: 'inactive',
+    label: 'Inactivo'
+  }
+];
+
+export const ACADEMY_PAYMENT_STATUSES = [
+  {
+    key: 'projected',
+    label: 'Proyectado'
+  },
+  {
+    key: 'pending',
+    label: 'Pendiente'
+  },
+  {
+    key: 'paid',
+    label: 'Pagado'
+  },
+  {
+    key: 'cancelled',
+    label: 'Anulado'
+  }
 ];
 
 /* =========================================================
@@ -533,6 +587,15 @@ export async function seedDatabase() {
     'general'
   );
 
+  const academySettings = {
+    cycleStartDay: 19,
+    cycleEndDay: 19,
+    playerStatuses:
+      ACADEMY_PLAYER_STATUSES,
+    paymentStatuses:
+      ACADEMY_PAYMENT_STATUSES
+  };
+
   if (!settings) {
     await db.put('settings', {
       id: 'general',
@@ -560,7 +623,33 @@ export async function seedDatabase() {
           TOURNAMENT_AGE_RANGES
       },
 
+      academySettings,
+
       updatedAt: new Date().toISOString()
     });
+  } else if (!settings.academySettings) {
+    await db.put('settings', {
+      ...settings,
+      id: 'general',
+      academySettings,
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  const academyLocations = await db.getAll(
+    'academyLocations'
+  );
+
+  if (!academyLocations.length) {
+    const now = new Date().toISOString();
+
+    for (const location of DEFAULT_ACADEMY_LOCATIONS) {
+      await db.put('academyLocations', {
+        ...location,
+        coachId: null,
+        createdAt: now,
+        updatedAt: now
+      });
+    }
   }
 }
