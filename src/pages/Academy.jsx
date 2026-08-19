@@ -13,6 +13,7 @@ import {
 import AcademyCoachForm from '../components/academy/AcademyCoachForm';
 import AcademyPlayerForm from '../components/academy/AcademyPlayerForm';
 import AcademyCycleSettingsForm from '../components/academy/AcademyCycleSettingsForm';
+import AcademyPayments from '../components/academy/AcademyPayments';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('es-CO', {
@@ -31,7 +32,10 @@ export default function Academy({
   onSaveCoach,
   onSavePlayer,
   onTogglePlayer,
-  onSaveCycleSettings
+  onSaveCycleSettings,
+  payments = [],
+  onChangePaymentStatus,
+  onUpdatePayment
 }) {
   const [coachLocation, setCoachLocation] =
     useState(null);
@@ -631,6 +635,19 @@ export default function Academy({
           </div>
         )}
       </section>
+
+      {currentCycle && (
+        <AcademyPayments
+          cycle={currentCycle}
+          payments={payments}
+          onChangeStatus={
+            onChangePaymentStatus
+          }
+          onUpdatePayment={
+            onUpdatePayment
+          }
+        />
+      )}
 
       {showCycleSettings && (
         <AcademyCycleSettingsForm
