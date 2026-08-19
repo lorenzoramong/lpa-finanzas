@@ -286,7 +286,110 @@ export async function ensureCurrentAcademyCycle({
   );
 
   if (activeCycle) {
-    return activeCycle;
+    /*
+     * El ciclo activo conserva lo que ya tenía, pero permite
+     * incorporar jugadores y entrenadores que se agreguen
+     * durante el mismo ciclo.
+     *
+     * Nunca eliminamos automáticamente snapshots existentes
+     * ni sobrescribimos sus valores históricos. Los ciclos
+     * cerrados permanecen completamente congelados.
+     */
+    const currentPlayerSnapshots =
+      activeCycle.playerSnapshots || [];
+
+    const currentCoachSnapshots =
+      activeCycle.coachSnapshots || [];
+
+    const existingPlayerIds = new Set(
+      currentPlayerSnapshots.map(
+        (player) => player.playerId
+      )
+    );
+
+    const existingCoachIds = new Set(
+      currentCoachSnapshots.map(
+        (coach) => coach.coachId
+      )
+    );
+
+    const newPlayerSnapshots =
+      createPlayerSnapshots({
+        players,
+        locations
+      }).filter(
+        (player) =>
+          !existingPlayerIds.has(player.playerId)
+      );
+
+    const newCoachSnapshots =
+      createCoachSnapshots({
+        coaches,
+        locations
+      }).filter(
+        (coach) =>
+          !existingCoachIds.has(coach.coachId)
+      );
+
+    if (
+      !newPlayerSnapshots.length &&
+      !newCoachSnapshots.length
+    ) {
+      return activeCycle;
+    }
+
+    const playerSnapshots = [
+      ...currentPlayerSnapshots,
+      ...newPlayerSnapshots
+    ];
+
+    const coachSnapshots = [
+      ...currentCoachSnapshots,
+      ...newCoachSnapshots
+    ];
+
+    const projectedIncome =
+      playerSnapshots.reduce(
+        (total, player) =>
+          total +
+          Number(player.monthlyFee || 0),
+        0
+      );
+
+    const projectedCoachExpense =
+      coachSnapshots.reduce(
+        (total, coach) =>
+          total +
+          Number(coach.paymentPerCycle || 0),
+        0
+      );
+
+    const updatedCycle = {
+      ...activeCycle,
+
+      playerSnapshots,
+      coachSnapshots,
+
+      projectedPlayers:
+        playerSnapshots.length,
+
+      projectedIncome,
+
+      projectedCoachExpense,
+
+      projectedUtility:
+        projectedIncome -
+        projectedCoachExpense,
+
+      updatedAt: now
+    };
+
+    await db.put(
+      'academyCycles',
+      updatedCycle
+    );
+
+    return updatedCycle;
   }
 
   const range = getAcademyCycleRange(
