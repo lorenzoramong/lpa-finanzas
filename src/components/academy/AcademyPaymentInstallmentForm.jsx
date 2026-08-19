@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  ArrowRight,
   CircleDollarSign,
   Save,
   X
@@ -23,11 +24,29 @@ export default function AcademyPaymentInstallmentForm({
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const pendingAmount = Number(
-    payment?.pendingAmount ??
-      payment?.amount ??
-      0
-  );
+  const totalAmount =
+    Number(payment?.amount || 0);
+
+  const paidAmount =
+    Number(payment?.paidAmount || 0);
+
+  const pendingAmount =
+    Number(
+      payment?.pendingAmount ??
+        totalAmount - paidAmount
+    );
+
+  const enteredAmount =
+    Number(amount || 0);
+
+  const remainingAfter =
+    Math.max(
+      0,
+      pendingAmount -
+        (Number.isFinite(enteredAmount)
+          ? enteredAmount
+          : 0)
+    );
 
   useEffect(() => {
     const today =
@@ -53,11 +72,9 @@ export default function AcademyPaymentInstallmentForm({
       return;
     }
 
-    if (value > pendingAmount) {
+    if (value >= pendingAmount) {
       alert(
-        `El máximo que puedes registrar es ${formatCurrency(
-          pendingAmount
-        )}.`
+        'Para pagar el saldo completo usa el botón "Pago completo". Esta ventana es solo para abonos parciales.'
       );
       return;
     }
@@ -93,17 +110,19 @@ export default function AcademyPaymentInstallmentForm({
         className="tournament-modal"
         role="dialog"
         aria-modal="true"
-        aria-label="Registrar abono"
+        aria-label="Registrar abono parcial"
       >
         <div className="tournament-modal-header">
           <div>
             <p className="eyebrow">
-              {payment.kind === 'player'
-                ? 'Cobro de mensualidad'
-                : 'Pago a entrenador'}
+              Abono parcial · Mensualidad
             </p>
 
             <h2>{payment.personName}</h2>
+
+            <span className="muted">
+              {payment.locationName || 'Sin sede'}
+            </span>
           </div>
 
           <button
@@ -115,29 +134,97 @@ export default function AcademyPaymentInstallmentForm({
           </button>
         </div>
 
-        <div className="tournament-comparison-list">
-          <div>
-            <span>Valor total</span>
-            <strong>
-              {formatCurrency(payment.amount)}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns:
+              'repeat(3, minmax(0, 1fr))',
+            gap: 12,
+            marginBottom: 22
+          }}
+        >
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid #dbe4ef',
+              borderRadius: 16,
+              background: '#f8fafc'
+            }}
+          >
+            <small
+              style={{
+                display: 'block',
+                marginBottom: 7,
+                fontWeight: 800,
+                color: '#64748b'
+              }}
+            >
+              VALOR TOTAL
+            </small>
+
+            <strong
+              style={{
+                fontSize: 18
+              }}
+            >
+              {formatCurrency(totalAmount)}
             </strong>
           </div>
 
-          <div>
-            <span>Ya abonado</span>
-            <strong className="positive">
-              {formatCurrency(
-                payment.paidAmount || 0
-              )}
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid #cfe9da',
+              borderRadius: 16,
+              background: '#f4fbf7'
+            }}
+          >
+            <small
+              style={{
+                display: 'block',
+                marginBottom: 7,
+                fontWeight: 800,
+                color: '#64748b'
+              }}
+            >
+              YA ABONADO
+            </small>
+
+            <strong
+              className="positive"
+              style={{
+                fontSize: 18
+              }}
+            >
+              {formatCurrency(paidAmount)}
             </strong>
           </div>
 
-          <div>
-            <span>Pendiente</span>
-            <strong>
-              {formatCurrency(
-                pendingAmount
-              )}
+          <div
+            style={{
+              padding: '16px',
+              border: '1px solid #dbe4ef',
+              borderRadius: 16,
+              background: '#ffffff'
+            }}
+          >
+            <small
+              style={{
+                display: 'block',
+                marginBottom: 7,
+                fontWeight: 800,
+                color: '#64748b'
+              }}
+            >
+              PENDIENTE
+            </small>
+
+            <strong
+              style={{
+                fontSize: 18
+              }}
+            >
+              {formatCurrency(pendingAmount)}
             </strong>
           </div>
         </div>
@@ -145,7 +232,7 @@ export default function AcademyPaymentInstallmentForm({
         <form onSubmit={submit}>
           <div className="form-grid">
             <label>
-              Valor de este abono
+              Valor del abono
 
               <div className="input-with-icon">
                 <CircleDollarSign size={18} />
@@ -153,7 +240,10 @@ export default function AcademyPaymentInstallmentForm({
                 <input
                   type="number"
                   min="1"
-                  max={pendingAmount}
+                  max={Math.max(
+                    0,
+                    pendingAmount - 1
+                  )}
                   step="1000"
                   value={amount}
                   onChange={(event) =>
@@ -161,14 +251,14 @@ export default function AcademyPaymentInstallmentForm({
                       event.target.value
                     )
                   }
-                  placeholder="0"
+                  placeholder="Ej. 200000"
                   autoFocus
                 />
               </div>
             </label>
 
             <label>
-              Fecha
+              Fecha del pago
               <input
                 type="date"
                 value={date}
@@ -179,6 +269,44 @@ export default function AcademyPaymentInstallmentForm({
                 }
               />
             </label>
+
+            <div
+              className="full"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 16,
+                padding: '14px 16px',
+                borderRadius: 14,
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0'
+              }}
+            >
+              <div>
+                <small
+                  style={{
+                    display: 'block',
+                    marginBottom: 4,
+                    color: '#64748b'
+                  }}
+                >
+                  Después de este abono quedaría pendiente
+                </small>
+
+                <strong
+                  style={{
+                    fontSize: 18
+                  }}
+                >
+                  {formatCurrency(
+                    remainingAfter
+                  )}
+                </strong>
+              </div>
+
+              <ArrowRight size={20} />
+            </div>
 
             <label className="full">
               Observaciones
@@ -205,7 +333,7 @@ export default function AcademyPaymentInstallmentForm({
 
               {saving
                 ? 'Registrando...'
-                : 'Registrar abono'}
+                : 'Registrar abono parcial'}
             </button>
 
             <button
