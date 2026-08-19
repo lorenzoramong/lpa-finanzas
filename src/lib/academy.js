@@ -402,3 +402,480 @@ export async function saveAcademyCycleSettings({
 
   return updatedGeneralSettings;
 }
+
+
+/* =========================================================
+   PAGOS Y PROYECCIONES DE ACADEMIA
+   ========================================================= */
+
+function academyPaymentProjectionId(paymentId) {
+  return `academy-projection-${paymentId}`;
+}
+
+function academyPaymentMovementId(paymentId) {
+  return `academy-movement-${paymentId}`;
+}
+
+function academyPaymentDescription(payment) {
+  if (payment.kind === 'player') {
+    return `Mensualidad academia - ${payment.personName}`;
+  }
+
+  return `Pago entrenador academia - ${payment.personName}`;
+}
+
+function academyPaymentSubcategory(payment) {
+  return payment.kind === 'player'
+    ? 'Mensualidades'
+    : 'Entrenadores';
+}
+
+async function syncAcademyProjection(payment) {
+  const projectionId =
+    academyPaymentProjectionId(payment.id);
+
+  const now = new Date().toISOString();
+
+  const status =
+    payment.status === 'paid' ||
+    payment.status === 'cancelled'
+      ? 'completed'
+      : 'pending';
+
+  await db.put('projections', {
+    id: projectionId,
+
+    type:
+      payment.type === 'expense'
+        ? 'expense'
+        : 'income',
+
+    description:
+      academyPaymentDescription(payment),
+
+    amount: Number(payment.amount || 0),
+
+    probability:
+      status === 'completed'
+        ? 100
+        : 100,
+
+    dueDate: payment.dueDate || '',
+
+    status,
+
+    notes: [
+      `Academia · ${payment.locationName || 'Sin sede'}.`,
+      `Ciclo ${payment.cycleStartDate || ''} → ${payment.cycleEndDate || ''}.`,
+      payment.notes || ''
+    ]
+      .filter(Boolean)
+      .join(' '),
+
+    source: 'academy',
+    academyPaymentId: payment.id,
+    academyCycleId: payment.cycleId,
+    academyLocationId: payment.locationId,
+
+    completedAt:
+      status === 'completed'
+        ? payment.paidAt || now
+        : null,
+
+    createdAt:
+      payment.projectionCreatedAt ||
+      payment.createdAt ||
+      now,
+
+    updatedAt: now
+  });
+}
+
+async function syncAcademyMovement(payment) {
+  const movementId =
+    academyPaymentMovementId(payment.id);
+
+  if (payment.status !== 'paid') {
+    const existing = await db.get(
+      'movements',
+      movementId
+    );
+
+    if (existing) {
+      await db.delete(
+        'movements',
+        movementId
+      );
+    }
+
+    return null;
+  }
+
+  const now = new Date().toISOString();
+
+  const movement = {
+    id: movementId,
+
+    type:
+      payment.type === 'expense'
+        ? 'expense'
+        : 'income',
+
+    date:
+      payment.paymentDate ||
+      payment.paidAt?.slice(0, 10) ||
+      now.slice(0, 10),
+
+    amount: Number(payment.amount || 0),
+
+    category: 'Academia',
+
+    subcategory:
+      academyPaymentSubcategory(payment),
+
+    description:
+      academyPaymentDescription(payment),
+
+    notes: [
+      `Sede: ${payment.locationName || 'Sin sede'}.`,
+      `Ciclo: ${payment.cycleStartDate || ''} → ${payment.cycleEndDate || ''}.`,
+      payment.notes || ''
+    ]
+      .filter(Boolean)
+      .join(' '),
+
+    source: 'academy',
+
+    academyPaymentId: payment.id,
+    academyCycleId: payment.cycleId,
+    academyLocationId: payment.locationId,
+
+    createdAt:
+      payment.movementCreatedAt ||
+      now,
+
+    updatedAt: now
+  };
+
+  await db.put(
+    'movements',
+    movement
+  );
+
+  return movement;
+}
+
+function createPlayerPayment({
+  cycle,
+  player,
+  now
+}) {
+  return {
+    id: `academy-payment-${cycle.id}-player-${player.playerId}`,
+
+    cycleId: cycle.id,
+    cycleStartDate: cycle.startDate,
+    cycleEndDate: cycle.endDate,
+
+    kind: 'player',
+    type: 'income',
+
+    personId: player.playerId,
+    personName: player.name,
+
+    locationId: player.locationId,
+    locationName: player.locationName,
+
+    amount: Number(
+      player.monthlyFee || 0
+    ),
+
+    originalAmount: Number(
+      player.monthlyFee || 0
+    ),
+
+    status: 'pending',
+
+    dueDate: cycle.endDate,
+
+    paymentDate: '',
+    paidAt: null,
+
+    notes: '',
+
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function createCoachPayment({
+  cycle,
+  coach,
+  now
+}) {
+  const cycleIsClosed =
+    cycle.status === 'closed';
+
+  return {
+    id: `academy-payment-${cycle.id}-coach-${coach.coachId}`,
+
+    cycleId: cycle.id,
+    cycleStartDate: cycle.startDate,
+    cycleEndDate: cycle.endDate,
+
+    kind: 'coach',
+    type: 'expense',
+
+    personId: coach.coachId,
+    personName: coach.name,
+
+    locationId: coach.locationId,
+    locationName: coach.locationName,
+
+    amount: Number(
+      coach.paymentPerCycle || 0
+    ),
+
+    originalAmount: Number(
+      coach.paymentPerCycle || 0
+    ),
+
+    status:
+      cycleIsClosed
+        ? 'pending'
+        : 'projected',
+
+    dueDate: cycle.endDate,
+
+    paymentDate: '',
+    paidAt: null,
+
+    notes: '',
+
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+export async function ensureAcademyCyclePayments({
+  cycles = [],
+  payments = []
+}) {
+  const existingById = new Map(
+    payments.map((payment) => [
+      payment.id,
+      payment
+    ])
+  );
+
+  const now = new Date().toISOString();
+
+  for (const cycle of cycles) {
+    for (const player of
+      cycle.playerSnapshots || []) {
+      const newPayment =
+        createPlayerPayment({
+          cycle,
+          player,
+          now
+        });
+
+      const existing =
+        existingById.get(newPayment.id);
+
+      if (!existing) {
+        await db.put(
+          'academyPayments',
+          newPayment
+        );
+
+        await syncAcademyProjection(
+          newPayment
+        );
+
+        existingById.set(
+          newPayment.id,
+          newPayment
+        );
+      } else {
+        await syncAcademyProjection(
+          existing
+        );
+      }
+    }
+
+    for (const coach of
+      cycle.coachSnapshots || []) {
+      const newPayment =
+        createCoachPayment({
+          cycle,
+          coach,
+          now
+        });
+
+      const existing =
+        existingById.get(newPayment.id);
+
+      if (!existing) {
+        await db.put(
+          'academyPayments',
+          newPayment
+        );
+
+        await syncAcademyProjection(
+          newPayment
+        );
+
+        existingById.set(
+          newPayment.id,
+          newPayment
+        );
+
+        continue;
+      }
+
+      /*
+       * Al cerrarse el ciclo, la obligación del entrenador
+       * pasa automáticamente de Proyectado a Pendiente.
+       */
+      if (
+        cycle.status === 'closed' &&
+        existing.status === 'projected'
+      ) {
+        const pendingPayment = {
+          ...existing,
+          status: 'pending',
+          updatedAt: now
+        };
+
+        await db.put(
+          'academyPayments',
+          pendingPayment
+        );
+
+        await syncAcademyProjection(
+          pendingPayment
+        );
+
+        existingById.set(
+          pendingPayment.id,
+          pendingPayment
+        );
+      } else {
+        await syncAcademyProjection(
+          existing
+        );
+      }
+    }
+  }
+}
+
+export async function updateAcademyPayment({
+  payment,
+  amount,
+  notes
+}) {
+  if (!payment?.id) {
+    throw new Error(
+      'No fue posible identificar el pago.'
+    );
+  }
+
+  const nextAmount = Number(amount);
+
+  if (
+    !Number.isFinite(nextAmount) ||
+    nextAmount < 0
+  ) {
+    throw new Error(
+      'El valor debe ser un número válido.'
+    );
+  }
+
+  const updatedPayment = {
+    ...payment,
+
+    amount: nextAmount,
+
+    notes:
+      String(notes ?? payment.notes ?? '')
+        .trim(),
+
+    updatedAt: new Date().toISOString()
+  };
+
+  await db.put(
+    'academyPayments',
+    updatedPayment
+  );
+
+  await syncAcademyProjection(
+    updatedPayment
+  );
+
+  await syncAcademyMovement(
+    updatedPayment
+  );
+
+  return updatedPayment;
+}
+
+export async function changeAcademyPaymentStatus({
+  payment,
+  status
+}) {
+  if (!payment?.id) {
+    throw new Error(
+      'No fue posible identificar el pago.'
+    );
+  }
+
+  if (
+    ![
+      'projected',
+      'pending',
+      'paid',
+      'cancelled'
+    ].includes(status)
+  ) {
+    throw new Error(
+      'Estado de pago no válido.'
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  const updatedPayment = {
+    ...payment,
+
+    status,
+
+    paidAt:
+      status === 'paid'
+        ? payment.paidAt || now
+        : null,
+
+    paymentDate:
+      status === 'paid'
+        ? payment.paymentDate ||
+          now.slice(0, 10)
+        : '',
+
+    updatedAt: now
+  };
+
+  await db.put(
+    'academyPayments',
+    updatedPayment
+  );
+
+  await syncAcademyProjection(
+    updatedPayment
+  );
+
+  await syncAcademyMovement(
+    updatedPayment
+  );
+
+  return updatedPayment;
+}
