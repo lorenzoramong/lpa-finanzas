@@ -7,6 +7,7 @@ import Movements from './pages/Movements';
 import History from './pages/History';
 import Projections from './pages/Projections';
 import Tournaments from './pages/Tournaments';
+import Academy from './pages/Academy';
 import Stats from './pages/Stats';
 import Settings from './pages/Settings';
 
@@ -70,6 +71,12 @@ export default function App() {
   const [selectedTournamentId, setSelectedTournamentId] =
     useState(null);
 
+  const [academyLocations, setAcademyLocations] = useState([]);
+  const [academyCoaches, setAcademyCoaches] = useState([]);
+  const [academyPlayers, setAcademyPlayers] = useState([]);
+  const [academyCycles, setAcademyCycles] = useState([]);
+  const [academySettings, setAcademySettings] = useState(null);
+
   const [settings, setSettings] = useState({
     initialBalance: 0,
     projectionTrafficLight: {
@@ -91,13 +98,23 @@ export default function App() {
         categoryData,
         projectionData,
         settingsData,
-        tournamentData
+        tournamentData,
+        academyLocationData,
+        academyCoachData,
+        academyPlayerData,
+        academyCycleData,
+        academySettingsData
       ] = await Promise.all([
         db.getAll('movements'),
         db.getAll('categories'),
         db.getAll('projections'),
         db.get('settings', 'general'),
-        loadTournamentModule()
+        loadTournamentModule(),
+        db.getAll('academyLocations'),
+        db.getAll('academyCoaches'),
+        db.getAll('academyPlayers'),
+        db.getAll('academyCycles'),
+        db.get('academySettings', 'general')
       ]);
 
       setMovements(movementData || []);
@@ -113,6 +130,12 @@ export default function App() {
       );
       setTournamentPlayers(tournamentData.players || []);
       setTournamentImports(tournamentData.imports || []);
+
+      setAcademyLocations(academyLocationData || []);
+      setAcademyCoaches(academyCoachData || []);
+      setAcademyPlayers(academyPlayerData || []);
+      setAcademyCycles(academyCycleData || []);
+      setAcademySettings(academySettingsData || null);
 
       setSettings(
         settingsData || {
@@ -1211,6 +1234,16 @@ export default function App() {
         onImportRegistrations={
           handleImportTournamentRegistrations
         }
+      />
+    ),
+
+    academy: (
+      <Academy
+        locations={academyLocations}
+        coaches={academyCoaches}
+        players={academyPlayers}
+        cycles={academyCycles}
+        settings={academySettings}
       />
     ),
 
