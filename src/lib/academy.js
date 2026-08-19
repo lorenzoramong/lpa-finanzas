@@ -515,8 +515,11 @@ function academyPaymentProjectionId(paymentId) {
   return `academy-projection-${paymentId}`;
 }
 
-function academyPaymentMovementId(paymentId) {
-  return `academy-movement-${paymentId}`;
+function academyInstallmentMovementId(
+  paymentId,
+  installmentId
+) {
+  return `academy-movement-${paymentId}-${installmentId}`;
 }
 
 function academyPaymentDescription(payment) {
@@ -533,15 +536,70 @@ function academyPaymentSubcategory(payment) {
     : 'Entrenadores';
 }
 
+function getPaymentTotals(payment) {
+  const amount = Math.max(
+    0,
+    Number(payment?.amount || 0)
+  );
+
+  const installments =
+    payment?.installments || [];
+
+  const paidAmount = installments.reduce(
+    (total, installment) =>
+      total +
+      Math.max(
+        0,
+        Number(installment.amount || 0)
+      ),
+    0
+  );
+
+  const pendingAmount = Math.max(
+    0,
+    amount - paidAmount
+  );
+
+  let status = payment?.status || 'pending';
+
+  if (status !== 'cancelled') {
+    if (paidAmount <= 0) {
+      status =
+        payment?.kind === 'coach' &&
+        payment?.status === 'projected'
+          ? 'projected'
+          : 'pending';
+    } else if (pendingAmount > 0) {
+      status = 'partial';
+    } else {
+      status = 'paid';
+    }
+  }
+
+  return {
+    amount,
+    paidAmount,
+    pendingAmount,
+    status
+  };
+}
+
 async function syncAcademyProjection(payment) {
   const projectionId =
     academyPaymentProjectionId(payment.id);
 
   const now = new Date().toISOString();
 
-  const status =
-    payment.status === 'paid' ||
-    payment.status === 'cancelled'
+  const totals = getPaymentTotals(payment);
+
+  /*
+   * La proyección representa únicamente lo que todavía falta
+   * por cobrar o pagar. Cada abono real va por separado al
+   * Flujo de Caja.
+   */
+  const projectionStatus =
+    totals.status === 'paid' ||
+    totals.status === 'cancelled'
       ? 'completed'
       : 'pending';
 
@@ -556,20 +614,27 @@ async function syncAcademyProjection(payment) {
     description:
       academyPaymentDescription(payment),
 
-    amount: Number(payment.amount || 0),
+    amount:
+      projectionStatus === 'completed'
+        ? 0
+        : totals.pendingAmount,
 
-    probability:
-      status === 'completed'
-        ? 100
-        : 100,
+    originalAmount: totals.amount,
+    paidAmount: totals.paidAmount,
+    pendingAmount: totals.pendingAmount,
+
+    probability: 100,
 
     dueDate: payment.dueDate || '',
 
-    status,
+    status: projectionStatus,
 
     notes: [
       `Academia · ${payment.locationName || 'Sin sede'}.`,
       `Ciclo ${payment.cycleStartDate || ''} → ${payment.cycleEndDate || ''}.`,
+      totals.paidAmount > 0
+        ? `Abonado: ${totals.paidAmount}. Pendiente: ${totals.pendingAmount}.`
+        : '',
       payment.notes || ''
     ]
       .filter(Boolean)
@@ -581,7 +646,7 @@ async function syncAcademyProjection(payment) {
     academyLocationId: payment.locationId,
 
     completedAt:
-      status === 'completed'
+      projectionStatus === 'completed'
         ? payment.paidAt || now
         : null,
 
@@ -594,30 +659,17 @@ async function syncAcademyProjection(payment) {
   });
 }
 
-async function syncAcademyMovement(payment) {
-  const movementId =
-    academyPaymentMovementId(payment.id);
-
-  if (payment.status !== 'paid') {
-    const existing = await db.get(
-      'movements',
-      movementId
-    );
-
-    if (existing) {
-      await db.delete(
-        'movements',
-        movementId
-      );
-    }
-
-    return null;
-  }
-
+async function syncAcademyInstallmentMovement({
+  payment,
+  installment
+}) {
   const now = new Date().toISOString();
 
   const movement = {
-    id: movementId,
+    id: academyInstallmentMovementId(
+      payment.id,
+      installment.id
+    ),
 
     type:
       payment.type === 'expense'
@@ -625,11 +677,12 @@ async function syncAcademyMovement(payment) {
         : 'income',
 
     date:
-      payment.paymentDate ||
-      payment.paidAt?.slice(0, 10) ||
+      installment.date ||
       now.slice(0, 10),
 
-    amount: Number(payment.amount || 0),
+    amount: Number(
+      installment.amount || 0
+    ),
 
     category: 'Academia',
 
@@ -642,6 +695,7 @@ async function syncAcademyMovement(payment) {
     notes: [
       `Sede: ${payment.locationName || 'Sin sede'}.`,
       `Ciclo: ${payment.cycleStartDate || ''} → ${payment.cycleEndDate || ''}.`,
+      installment.notes || '',
       payment.notes || ''
     ]
       .filter(Boolean)
@@ -650,11 +704,12 @@ async function syncAcademyMovement(payment) {
     source: 'academy',
 
     academyPaymentId: payment.id,
+    academyInstallmentId: installment.id,
     academyCycleId: payment.cycleId,
     academyLocationId: payment.locationId,
 
     createdAt:
-      payment.movementCreatedAt ||
+      installment.createdAt ||
       now,
 
     updatedAt: now
@@ -666,6 +721,137 @@ async function syncAcademyMovement(payment) {
   );
 
   return movement;
+}
+
+async function deleteAcademyInstallmentMovements(
+  payment
+) {
+  const movements =
+    await db.getAll('movements');
+
+  const related = movements.filter(
+    (movement) =>
+      movement.source === 'academy' &&
+      movement.academyPaymentId === payment.id
+  );
+
+  for (const movement of related) {
+    await db.delete(
+      'movements',
+      movement.id
+    );
+  }
+}
+
+async function syncAllAcademyInstallmentMovements(
+  payment
+) {
+  await deleteAcademyInstallmentMovements(
+    payment
+  );
+
+  if (payment.status === 'cancelled') {
+    return;
+  }
+
+  for (const installment of
+    payment.installments || []) {
+    await syncAcademyInstallmentMovement({
+      payment,
+      installment
+    });
+  }
+}
+
+async function updateCycleFromPayment(payment) {
+  if (!payment?.cycleId) {
+    return;
+  }
+
+  const cycle = await db.get(
+    'academyCycles',
+    payment.cycleId
+  );
+
+  if (!cycle) {
+    return;
+  }
+
+  let playerSnapshots =
+    cycle.playerSnapshots || [];
+
+  let coachSnapshots =
+    cycle.coachSnapshots || [];
+
+  if (payment.kind === 'player') {
+    playerSnapshots =
+      playerSnapshots.map((snapshot) =>
+        snapshot.playerId === payment.personId
+          ? {
+              ...snapshot,
+              monthlyFee: Number(
+                payment.amount || 0
+              )
+            }
+          : snapshot
+      );
+  }
+
+  if (payment.kind === 'coach') {
+    coachSnapshots =
+      coachSnapshots.map((snapshot) =>
+        snapshot.coachId === payment.personId
+          ? {
+              ...snapshot,
+              paymentPerCycle: Number(
+                payment.amount || 0
+              )
+            }
+          : snapshot
+      );
+  }
+
+  const projectedIncome =
+    playerSnapshots.reduce(
+      (total, snapshot) =>
+        total +
+        Number(snapshot.monthlyFee || 0),
+      0
+    );
+
+  const projectedCoachExpense =
+    coachSnapshots.reduce(
+      (total, snapshot) =>
+        total +
+        Number(
+          snapshot.paymentPerCycle || 0
+        ),
+      0
+    );
+
+  await db.put(
+    'academyCycles',
+    {
+      ...cycle,
+
+      playerSnapshots,
+      coachSnapshots,
+
+      projectedPlayers:
+        playerSnapshots.length,
+
+      projectedIncome,
+
+      projectedCoachExpense,
+
+      projectedUtility:
+        projectedIncome -
+        projectedCoachExpense,
+
+      updatedAt:
+        new Date().toISOString()
+    }
+  );
 }
 
 function createPlayerPayment({
@@ -696,6 +882,13 @@ function createPlayerPayment({
     originalAmount: Number(
       player.monthlyFee || 0
     ),
+
+    paidAmount: 0,
+    pendingAmount: Number(
+      player.monthlyFee || 0
+    ),
+
+    installments: [],
 
     status: 'pending',
 
@@ -743,6 +936,13 @@ function createCoachPayment({
       coach.paymentPerCycle || 0
     ),
 
+    paidAmount: 0,
+    pendingAmount: Number(
+      coach.paymentPerCycle || 0
+    ),
+
+    installments: [],
+
     status:
       cycleIsClosed
         ? 'pending'
@@ -757,6 +957,65 @@ function createCoachPayment({
 
     createdAt: now,
     updatedAt: now
+  };
+}
+
+function normalizeExistingPayment(payment) {
+  const installments =
+    payment.installments || [];
+
+  /*
+   * Compatibilidad con pagos del Paso 6 que pudieron
+   * haberse marcado como pagados antes de incorporar abonos.
+   */
+  let normalizedInstallments = installments;
+
+  if (
+    payment.status === 'paid' &&
+    !installments.length &&
+    Number(payment.amount || 0) > 0
+  ) {
+    const now = new Date().toISOString();
+
+    normalizedInstallments = [
+      {
+        id: crypto.randomUUID(),
+        amount: Number(
+          payment.amount || 0
+        ),
+        date:
+          payment.paymentDate ||
+          payment.paidAt?.slice(0, 10) ||
+          now.slice(0, 10),
+        notes:
+          'Pago migrado desde el esquema anterior.',
+        createdAt:
+          payment.paidAt ||
+          payment.updatedAt ||
+          now
+      }
+    ];
+  }
+
+  const normalized = {
+    ...payment,
+    installments: normalizedInstallments
+  };
+
+  const totals = getPaymentTotals(
+    normalized
+  );
+
+  return {
+    ...normalized,
+    ...totals,
+
+    paidAt:
+      totals.status === 'paid'
+        ? payment.paidAt ||
+          normalizedInstallments.at(-1)?.createdAt ||
+          new Date().toISOString()
+        : null
   };
 }
 
@@ -800,11 +1059,30 @@ export async function ensureAcademyCyclePayments({
           newPayment.id,
           newPayment
         );
-      } else {
-        await syncAcademyProjection(
-          existing
-        );
+
+        continue;
       }
+
+      const normalized =
+        normalizeExistingPayment(existing);
+
+      await db.put(
+        'academyPayments',
+        normalized
+      );
+
+      await syncAcademyProjection(
+        normalized
+      );
+
+      await syncAllAcademyInstallmentMovements(
+        normalized
+      );
+
+      existingById.set(
+        normalized.id,
+        normalized
+      );
     }
 
     for (const coach of
@@ -837,38 +1115,37 @@ export async function ensureAcademyCyclePayments({
         continue;
       }
 
-      /*
-       * Al cerrarse el ciclo, la obligación del entrenador
-       * pasa automáticamente de Proyectado a Pendiente.
-       */
+      let normalized =
+        normalizeExistingPayment(existing);
+
       if (
         cycle.status === 'closed' &&
-        existing.status === 'projected'
+        normalized.status === 'projected'
       ) {
-        const pendingPayment = {
-          ...existing,
+        normalized = {
+          ...normalized,
           status: 'pending',
           updatedAt: now
         };
-
-        await db.put(
-          'academyPayments',
-          pendingPayment
-        );
-
-        await syncAcademyProjection(
-          pendingPayment
-        );
-
-        existingById.set(
-          pendingPayment.id,
-          pendingPayment
-        );
-      } else {
-        await syncAcademyProjection(
-          existing
-        );
       }
+
+      await db.put(
+        'academyPayments',
+        normalized
+      );
+
+      await syncAcademyProjection(
+        normalized
+      );
+
+      await syncAllAcademyInstallmentMovements(
+        normalized
+      );
+
+      existingById.set(
+        normalized.id,
+        normalized
+      );
     }
   }
 }
@@ -895,16 +1172,44 @@ export async function updateAcademyPayment({
     );
   }
 
-  const updatedPayment = {
-    ...payment,
+  const current =
+    normalizeExistingPayment(payment);
+
+  if (nextAmount < current.paidAmount) {
+    throw new Error(
+      `El nuevo valor no puede ser menor que lo ya abonado (${current.paidAmount}).`
+    );
+  }
+
+  const draft = {
+    ...current,
 
     amount: nextAmount,
 
     notes:
-      String(notes ?? payment.notes ?? '')
+      String(notes ?? current.notes ?? '')
         .trim(),
 
-    updatedAt: new Date().toISOString()
+    status:
+      current.status === 'cancelled'
+        ? 'cancelled'
+        : current.status,
+
+    updatedAt:
+      new Date().toISOString()
+  };
+
+  const totals = getPaymentTotals(draft);
+
+  const updatedPayment = {
+    ...draft,
+    ...totals,
+
+    paidAt:
+      totals.status === 'paid'
+        ? draft.paidAt ||
+          new Date().toISOString()
+        : null
   };
 
   await db.put(
@@ -912,11 +1217,127 @@ export async function updateAcademyPayment({
     updatedPayment
   );
 
+  /*
+   * Esto hace que editar el valor del entrenador o del alumno
+   * se refleje también en el resumen del ciclo y en todas las
+   * tarjetas que usan projectedIncome / projectedCoachExpense.
+   */
+  await updateCycleFromPayment(
+    updatedPayment
+  );
+
   await syncAcademyProjection(
     updatedPayment
   );
 
-  await syncAcademyMovement(
+  await syncAllAcademyInstallmentMovements(
+    updatedPayment
+  );
+
+  return updatedPayment;
+}
+
+export async function addAcademyPaymentInstallment({
+  payment,
+  amount,
+  date,
+  notes
+}) {
+  if (!payment?.id) {
+    throw new Error(
+      'No fue posible identificar el pago.'
+    );
+  }
+
+  const current =
+    normalizeExistingPayment(payment);
+
+  if (current.status === 'cancelled') {
+    throw new Error(
+      'No puedes registrar abonos en un pago anulado.'
+    );
+  }
+
+  if (
+    payment.kind === 'coach' &&
+    current.status === 'projected'
+  ) {
+    throw new Error(
+      'El pago del entrenador todavía está proyectado. Debe estar pendiente antes de registrar un abono.'
+    );
+  }
+
+  const installmentAmount =
+    Number(amount);
+
+  if (
+    !Number.isFinite(installmentAmount) ||
+    installmentAmount <= 0
+  ) {
+    throw new Error(
+      'El abono debe ser mayor que cero.'
+    );
+  }
+
+  if (
+    installmentAmount >
+    current.pendingAmount
+  ) {
+    throw new Error(
+      `El abono no puede superar el saldo pendiente (${current.pendingAmount}).`
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  const installment = {
+    id: crypto.randomUUID(),
+    amount: installmentAmount,
+    date:
+      date ||
+      now.slice(0, 10),
+    notes:
+      String(notes || '').trim(),
+    createdAt: now
+  };
+
+  const draft = {
+    ...current,
+    installments: [
+      ...(current.installments || []),
+      installment
+    ],
+    updatedAt: now
+  };
+
+  const totals = getPaymentTotals(draft);
+
+  const updatedPayment = {
+    ...draft,
+    ...totals,
+
+    paymentDate:
+      totals.status === 'paid'
+        ? installment.date
+        : '',
+
+    paidAt:
+      totals.status === 'paid'
+        ? now
+        : null
+  };
+
+  await db.put(
+    'academyPayments',
+    updatedPayment
+  );
+
+  await syncAcademyInstallmentMovement({
+    payment: updatedPayment,
+    installment
+  });
+
+  await syncAcademyProjection(
     updatedPayment
   );
 
@@ -937,34 +1358,27 @@ export async function changeAcademyPaymentStatus({
     ![
       'projected',
       'pending',
-      'paid',
       'cancelled'
     ].includes(status)
   ) {
     throw new Error(
-      'Estado de pago no válido.'
+      'El estado se calcula automáticamente con los abonos. Usa Registrar abono para pasar a Parcial o Pagado.'
     );
   }
 
-  const now = new Date().toISOString();
+  const current =
+    normalizeExistingPayment(payment);
 
   const updatedPayment = {
-    ...payment,
+    ...current,
 
     status,
 
-    paidAt:
-      status === 'paid'
-        ? payment.paidAt || now
-        : null,
+    paidAt: null,
+    paymentDate: '',
 
-    paymentDate:
-      status === 'paid'
-        ? payment.paymentDate ||
-          now.slice(0, 10)
-        : '',
-
-    updatedAt: now
+    updatedAt:
+      new Date().toISOString()
   };
 
   await db.put(
@@ -976,13 +1390,18 @@ export async function changeAcademyPaymentStatus({
     updatedPayment
   );
 
-  await syncAcademyMovement(
-    updatedPayment
-  );
+  if (status === 'cancelled') {
+    await deleteAcademyInstallmentMovements(
+      updatedPayment
+    );
+  } else {
+    await syncAllAcademyInstallmentMovements(
+      updatedPayment
+    );
+  }
 
   return updatedPayment;
 }
-
 
 /* =========================================================
    ELIMINAR JUGADOR DE ACADEMIA
@@ -1001,10 +1420,6 @@ export async function removeAcademyPlayer({
 
   const now = new Date().toISOString();
 
-  /*
-   * El jugador se elimina de la base activa de Academia.
-   * Los ciclos cerrados permanecen intactos como histórico.
-   */
   await db.delete(
     'academyPlayers',
     player.id
@@ -1036,12 +1451,17 @@ export async function removeAcademyPlayer({
         (item) => item.id === paymentId
       );
 
+    const normalizedPayment = payment
+      ? normalizeExistingPayment(payment)
+      : null;
+
     /*
-     * Si ya hubo un pago real, conservamos el registro del
-     * ciclo vigente para no alterar el histórico financiero.
-     * El jugador sí desaparece de la lista general.
+     * Si ya hubo uno o más abonos reales, conservamos el
+     * registro del ciclo y sus movimientos como histórico.
      */
-    if (payment?.status === 'paid') {
+    if (
+      normalizedPayment?.paidAmount > 0
+    ) {
       continue;
     }
 
@@ -1107,18 +1527,21 @@ export async function removeAcademyPlayer({
       );
     }
 
-    const movementId =
-      academyPaymentMovementId(paymentId);
+    const movements =
+      await db.getAll('movements');
 
-    const movement = await db.get(
-      'movements',
-      movementId
-    );
+    const relatedMovements =
+      movements.filter(
+        (movement) =>
+          movement.source === 'academy' &&
+          movement.academyPaymentId === paymentId
+      );
 
-    if (movement) {
+    for (const movement of
+      relatedMovements) {
       await db.delete(
         'movements',
-        movementId
+        movement.id
       );
     }
   }
