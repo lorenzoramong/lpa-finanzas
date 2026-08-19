@@ -14,6 +14,11 @@ import Settings from './pages/Settings';
 import { db, seedDatabase } from './lib/db';
 
 import {
+  ensureCurrentAcademyCycle,
+  saveAcademyCycleSettings
+} from './lib/academy';
+
+import {
   prepareImportedRegistrationForSave
 } from './lib/tournamentImport';
 
@@ -102,8 +107,7 @@ export default function App() {
         academyLocationData,
         academyCoachData,
         academyPlayerData,
-        academyCycleData,
-        academySettingsData
+        academyCycleData
       ] = await Promise.all([
         db.getAll('movements'),
         db.getAll('categories'),
@@ -113,9 +117,20 @@ export default function App() {
         db.getAll('academyLocations'),
         db.getAll('academyCoaches'),
         db.getAll('academyPlayers'),
-        db.getAll('academyCycles'),
-        db.get('academySettings', 'general')
+        db.getAll('academyCycles')
       ]);
+
+      await ensureCurrentAcademyCycle({
+        cycles: academyCycleData || [],
+        players: academyPlayerData || [],
+        coaches: academyCoachData || [],
+        locations: academyLocationData || [],
+        settings:
+          settingsData?.academySettings || {}
+      });
+
+      const refreshedAcademyCycles =
+        await db.getAll('academyCycles');
 
       setMovements(movementData || []);
       setCategories(categoryData || []);
@@ -134,8 +149,15 @@ export default function App() {
       setAcademyLocations(academyLocationData || []);
       setAcademyCoaches(academyCoachData || []);
       setAcademyPlayers(academyPlayerData || []);
-      setAcademyCycles(academyCycleData || []);
-      setAcademySettings(academySettingsData || null);
+      setAcademyCycles(
+        refreshedAcademyCycles || []
+      );
+      setAcademySettings(
+        settingsData?.academySettings || {
+          cycleStartDay: 19,
+          cycleEndDay: 19
+        }
+      );
 
       setSettings(
         settingsData || {
@@ -1129,6 +1151,41 @@ export default function App() {
     }
   };
 
+  const handleSaveAcademyCycleSettings = async ({
+    cycleStartDay,
+    cycleEndDay
+  }) => {
+    try {
+      const updatedSettings =
+        await saveAcademyCycleSettings({
+          generalSettings: settings,
+          cycleStartDay,
+          cycleEndDay
+        });
+
+      setSettings(updatedSettings);
+
+      setAcademySettings(
+        updatedSettings.academySettings
+      );
+
+      await load();
+
+      return updatedSettings.academySettings;
+    } catch (error) {
+      console.error(
+        'Error al guardar configuración de ciclos:',
+        error
+      );
+
+      alert(
+        'No fue posible guardar la configuración de ciclos.'
+      );
+
+      return null;
+    }
+  };
+
   const addCategory = async (category) => {
     try {
       await db.put('categories', {
@@ -1447,6 +1504,9 @@ export default function App() {
         onSaveCoach={handleSaveAcademyCoach}
         onSavePlayer={handleSaveAcademyPlayer}
         onTogglePlayer={handleToggleAcademyPlayer}
+        onSaveCycleSettings={
+          handleSaveAcademyCycleSettings
+        }
       />
     ),
 
@@ -1480,5 +1540,4 @@ export default function App() {
     </Layout>
   );
 }
-
 
