@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import {
-  CheckCircle2,
   Edit3,
-  UserRound,
+  Plus,
   Wallet,
   X
 } from 'lucide-react';
+
+import AcademyPaymentInstallmentForm from './AcademyPaymentInstallmentForm';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('es-CO', {
@@ -15,32 +16,66 @@ function formatCurrency(value) {
   }).format(Number(value || 0));
 }
 
-function statusLabel(payment) {
-  if (payment.status === 'paid') {
+function paymentTotals(payment) {
+  const amount = Number(
+    payment.amount || 0
+  );
+
+  const paidAmount =
+    payment.paidAmount ??
+    (payment.installments || []).reduce(
+      (total, installment) =>
+        total +
+        Number(installment.amount || 0),
+      0
+    );
+
+  return {
+    amount,
+    paidAmount,
+    pendingAmount:
+      payment.pendingAmount ??
+      Math.max(
+        0,
+        amount - paidAmount
+      )
+  };
+}
+
+function statusLabel(status) {
+  if (status === 'paid') {
     return 'Pagado';
   }
 
-  if (payment.status === 'cancelled') {
+  if (status === 'partial') {
+    return 'Parcial';
+  }
+
+  if (status === 'cancelled') {
     return 'Anulado';
   }
 
-  if (payment.status === 'projected') {
+  if (status === 'projected') {
     return 'Proyectado';
   }
 
   return 'Pendiente';
 }
 
-function statusClass(payment) {
-  if (payment.status === 'paid') {
+function statusClass(status) {
+  if (status === 'paid') {
     return 'completed';
   }
 
-  if (payment.status === 'cancelled') {
+  if (status === 'partial') {
+    return 'partial';
+  }
+
+  if (status === 'cancelled') {
     return 'cancelled';
   }
 
-  if (payment.status === 'projected') {
+  if (status === 'projected') {
     return 'projected';
   }
 
@@ -51,9 +86,13 @@ export default function AcademyPayments({
   cycle,
   payments = [],
   onChangeStatus,
-  onUpdatePayment
+  onUpdatePayment,
+  onAddInstallment
 }) {
   const [editingPayment, setEditingPayment] =
+    useState(null);
+
+  const [installmentPayment, setInstallmentPayment] =
     useState(null);
 
   const [amount, setAmount] = useState('');
@@ -78,39 +117,39 @@ export default function AcademyPayments({
   );
 
   const collectedIncome =
-    playerPayments
-      .filter(
-        (payment) => payment.status === 'paid'
-      )
-      .reduce(
-        (total, payment) =>
-          total + Number(payment.amount || 0),
-        0
-      );
+    playerPayments.reduce(
+      (total, payment) =>
+        total +
+        Number(
+          paymentTotals(payment).paidAmount
+        ),
+      0
+    );
 
   const pendingIncome =
     playerPayments
       .filter(
         (payment) =>
-          payment.status !== 'paid' &&
           payment.status !== 'cancelled'
       )
       .reduce(
         (total, payment) =>
-          total + Number(payment.amount || 0),
+          total +
+          Number(
+            paymentTotals(payment).pendingAmount
+          ),
         0
       );
 
   const paidCoachExpense =
-    coachPayments
-      .filter(
-        (payment) => payment.status === 'paid'
-      )
-      .reduce(
-        (total, payment) =>
-          total + Number(payment.amount || 0),
-        0
-      );
+    coachPayments.reduce(
+      (total, payment) =>
+        total +
+        Number(
+          paymentTotals(payment).paidAmount
+        ),
+      0
+    );
 
   const openEditor = (payment) => {
     setEditingPayment(payment);
@@ -148,13 +187,159 @@ export default function AcademyPayments({
     }
   };
 
-  const changeStatus = async (
-    payment,
-    status
+  const renderPaymentRows = (
+    list,
+    kind
   ) => {
-    await onChangeStatus({
-      payment,
-      status
+    if (!list.length) {
+      return (
+        <tr>
+          <td colSpan="6">
+            <div className="empty-state">
+              {kind === 'player'
+                ? 'No hay mensualidades para este ciclo.'
+                : 'No hay obligaciones de entrenador para este ciclo.'}
+            </div>
+          </td>
+        </tr>
+      );
+    }
+
+    return list.map((payment) => {
+      const totals =
+        paymentTotals(payment);
+
+      const canRegisterInstallment =
+        payment.status !== 'cancelled' &&
+        payment.status !== 'paid' &&
+        totals.pendingAmount > 0 &&
+        !(
+          payment.kind === 'coach' &&
+          payment.status === 'projected'
+        );
+
+      return (
+        <tr key={payment.id}>
+          <td>
+            <strong>
+              {payment.personName}
+            </strong>
+
+            <small>
+              {totals.paidAmount > 0
+                ? `${formatCurrency(
+                    totals.paidAmount
+                  )} abonados`
+                : payment.status === 'projected'
+                  ? 'Obligación proyectada'
+                  : 'Sin abonos'}
+            </small>
+          </td>
+
+          <td>
+            {payment.locationName ||
+              'Sin sede'}
+          </td>
+
+          <td>
+            <strong>
+              {formatCurrency(
+                totals.amount
+              )}
+            </strong>
+          </td>
+
+          <td>
+            <strong
+              className={
+                totals.pendingAmount > 0
+                  ? ''
+                  : 'positive'
+              }
+            >
+              {formatCurrency(
+                totals.pendingAmount
+              )}
+            </strong>
+          </td>
+
+          <td>
+            <span
+              className={`tournament-status-pill ${statusClass(
+                payment.status
+              )}`}
+            >
+              {statusLabel(
+                payment.status
+              )}
+            </span>
+          </td>
+
+          <td>
+            <div className="tournament-row-actions">
+              {canRegisterInstallment && (
+                <button
+                  type="button"
+                  title="Registrar pago o abono"
+                  onClick={() =>
+                    setInstallmentPayment(
+                      payment
+                    )
+                  }
+                >
+                  <Plus size={16} />
+                </button>
+              )}
+
+              <button
+                type="button"
+                title="Editar valor total"
+                onClick={() =>
+                  openEditor(payment)
+                }
+              >
+                <Edit3 size={16} />
+              </button>
+
+              {payment.status !==
+                'cancelled' && (
+                <button
+                  type="button"
+                  title="Anular"
+                  onClick={() =>
+                    onChangeStatus({
+                      payment,
+                      status: 'cancelled'
+                    })
+                  }
+                >
+                  <X size={16} />
+                </button>
+              )}
+
+              {payment.status ===
+                'cancelled' && (
+                <button
+                  type="button"
+                  title="Reactivar"
+                  onClick={() =>
+                    onChangeStatus({
+                      payment,
+                      status:
+                        payment.kind === 'coach' &&
+                        cycle.status !== 'closed'
+                          ? 'projected'
+                          : 'pending'
+                    })
+                  }
+                >
+                  <Wallet size={16} />
+                </button>
+              )}
+            </div>
+          </td>
+        </tr>
+      );
     });
   };
 
@@ -190,14 +375,14 @@ export default function AcademyPayments({
         </article>
 
         <article className="tournament-kpi-card expense">
-          <small>Entrenadores pagados</small>
+          <small>Pagado a entrenadores</small>
           <strong>
             {formatCurrency(paidCoachExpense)}
           </strong>
         </article>
 
         <article className="tournament-kpi-card players">
-          <small>Alumnos pagados</small>
+          <small>Alumnos al día</small>
           <strong>
             {
               playerPayments.filter(
@@ -229,92 +414,18 @@ export default function AcademyPayments({
                 <tr>
                   <th>Jugador</th>
                   <th>Sede</th>
-                  <th>Valor</th>
+                  <th>Total</th>
+                  <th>Pendiente</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
 
               <tbody>
-                {!playerPayments.length && (
-                  <tr>
-                    <td colSpan="5">
-                      <div className="empty-state">
-                        No hay mensualidades para este ciclo.
-                      </div>
-                    </td>
-                  </tr>
+                {renderPaymentRows(
+                  playerPayments,
+                  'player'
                 )}
-
-                {playerPayments.map((payment) => (
-                  <tr key={payment.id}>
-                    <td>
-                      <strong>
-                        {payment.personName}
-                      </strong>
-
-                      <small>
-                        {payment.status === 'paid'
-                          ? 'Ingreso enviado al flujo de caja'
-                          : 'Ingreso proyectado'}
-                      </small>
-                    </td>
-
-                    <td>
-                      {payment.locationName ||
-                        'Sin sede'}
-                    </td>
-
-                    <td>
-                      <strong>
-                        {formatCurrency(
-                          payment.amount
-                        )}
-                      </strong>
-                    </td>
-
-                    <td>
-                      <select
-                        className={`tournament-status-select ${statusClass(
-                          payment
-                        )}`}
-                        value={payment.status}
-                        onChange={(event) =>
-                          changeStatus(
-                            payment,
-                            event.target.value
-                          )
-                        }
-                      >
-                        <option value="pending">
-                          Pendiente
-                        </option>
-
-                        <option value="paid">
-                          Pagado
-                        </option>
-
-                        <option value="cancelled">
-                          Anulado
-                        </option>
-                      </select>
-                    </td>
-
-                    <td>
-                      <div className="tournament-row-actions">
-                        <button
-                          type="button"
-                          title="Editar valor"
-                          onClick={() =>
-                            openEditor(payment)
-                          }
-                        >
-                          <Edit3 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
               </tbody>
             </table>
           </div>
@@ -337,104 +448,33 @@ export default function AcademyPayments({
                 <tr>
                   <th>Entrenador</th>
                   <th>Sede</th>
-                  <th>Valor</th>
+                  <th>Total</th>
+                  <th>Pendiente</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
               </thead>
 
               <tbody>
-                {!coachPayments.length && (
-                  <tr>
-                    <td colSpan="5">
-                      <div className="empty-state">
-                        No hay obligaciones de entrenador para
-                        este ciclo.
-                      </div>
-                    </td>
-                  </tr>
+                {renderPaymentRows(
+                  coachPayments,
+                  'coach'
                 )}
-
-                {coachPayments.map((payment) => (
-                  <tr key={payment.id}>
-                    <td>
-                      <strong>
-                        {payment.personName}
-                      </strong>
-
-                      <small>
-                        {payment.status === 'projected'
-                          ? 'Se vuelve pendiente al cerrar el ciclo'
-                          : payment.status === 'paid'
-                            ? 'Egreso enviado al flujo de caja'
-                            : 'Obligación del ciclo'}
-                      </small>
-                    </td>
-
-                    <td>
-                      {payment.locationName ||
-                        'Sin sede'}
-                    </td>
-
-                    <td>
-                      <strong>
-                        {formatCurrency(
-                          payment.amount
-                        )}
-                      </strong>
-                    </td>
-
-                    <td>
-                      <select
-                        className={`tournament-status-select ${statusClass(
-                          payment
-                        )}`}
-                        value={payment.status}
-                        onChange={(event) =>
-                          changeStatus(
-                            payment,
-                            event.target.value
-                          )
-                        }
-                      >
-                        <option value="projected">
-                          Proyectado
-                        </option>
-
-                        <option value="pending">
-                          Pendiente
-                        </option>
-
-                        <option value="paid">
-                          Pagado
-                        </option>
-
-                        <option value="cancelled">
-                          Anulado
-                        </option>
-                      </select>
-                    </td>
-
-                    <td>
-                      <div className="tournament-row-actions">
-                        <button
-                          type="button"
-                          title="Editar valor"
-                          onClick={() =>
-                            openEditor(payment)
-                          }
-                        >
-                          <Edit3 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
               </tbody>
             </table>
           </div>
         </article>
       </div>
+
+      {installmentPayment && (
+        <AcademyPaymentInstallmentForm
+          payment={installmentPayment}
+          onSave={onAddInstallment}
+          onClose={() =>
+            setInstallmentPayment(null)
+          }
+        />
+      )}
 
       {editingPayment && (
         <div
@@ -478,10 +518,14 @@ export default function AcademyPayments({
             <form onSubmit={saveEdit}>
               <div className="form-grid">
                 <label className="full">
-                  Valor del ciclo
+                  Valor total del ciclo
                   <input
                     type="number"
-                    min="0"
+                    min={
+                      paymentTotals(
+                        editingPayment
+                      ).paidAmount
+                    }
                     step="1000"
                     value={amount}
                     onChange={(event) =>
@@ -490,6 +534,15 @@ export default function AcademyPayments({
                       )
                     }
                   />
+
+                  <small>
+                    Ya abonado:{' '}
+                    {formatCurrency(
+                      paymentTotals(
+                        editingPayment
+                      ).paidAmount
+                    )}
+                  </small>
                 </label>
 
                 <label className="full">
@@ -514,6 +567,7 @@ export default function AcademyPayments({
                   disabled={saving}
                 >
                   <Wallet size={18} />
+
                   {saving
                     ? 'Guardando...'
                     : 'Guardar valor'}
