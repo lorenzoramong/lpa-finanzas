@@ -1010,6 +1010,125 @@ export default function App() {
     }
   };
 
+  const handleSaveAcademyPlayer = async (playerData) => {
+    if (!playerData?.locationId) {
+      alert('No fue posible identificar la sede.');
+      return null;
+    }
+
+    try {
+      const existingPlayer = playerData.id
+        ? academyPlayers.find(
+            (player) => player.id === playerData.id
+          )
+        : null;
+
+      const now = new Date().toISOString();
+
+      const player = {
+        ...existingPlayer,
+        ...playerData,
+
+        id:
+          existingPlayer?.id ||
+          playerData.id ||
+          crypto.randomUUID(),
+
+        name: String(
+          playerData.name || ''
+        ).trim(),
+
+        phone: String(
+          playerData.phone || ''
+        ).trim(),
+
+        email: String(
+          playerData.email || ''
+        ).trim(),
+
+        monthlyFee: Number(
+          playerData.monthlyFee || 0
+        ),
+
+        active:
+          playerData.active !== false,
+
+        notes: String(
+          playerData.notes || ''
+        ).trim(),
+
+        createdAt:
+          existingPlayer?.createdAt ||
+          playerData.createdAt ||
+          now,
+
+        updatedAt: now
+      };
+
+      if (!player.name) {
+        alert('El jugador debe tener un nombre.');
+        return null;
+      }
+
+      await db.put(
+        'academyPlayers',
+        player
+      );
+
+      await load();
+
+      return player;
+    } catch (error) {
+      console.error(
+        'Error al guardar jugador:',
+        error
+      );
+
+      alert(
+        'No fue posible guardar el jugador.'
+      );
+
+      return null;
+    }
+  };
+
+  const handleToggleAcademyPlayer = async (
+    player,
+    nextActive
+  ) => {
+    if (!player?.id) {
+      return null;
+    }
+
+    try {
+      const updatedPlayer = {
+        ...player,
+        active: nextActive,
+        updatedAt: new Date().toISOString()
+      };
+
+      await db.put(
+        'academyPlayers',
+        updatedPlayer
+      );
+
+      await load();
+
+      return updatedPlayer;
+    } catch (error) {
+      console.error(
+        'Error al cambiar estado del jugador:',
+        error
+      );
+
+      alert(
+        'No fue posible cambiar el estado del jugador.'
+      );
+
+      return null;
+    }
+  };
+
   const addCategory = async (category) => {
     try {
       await db.put('categories', {
@@ -1326,6 +1445,8 @@ export default function App() {
         cycles={academyCycles}
         settings={academySettings}
         onSaveCoach={handleSaveAcademyCoach}
+        onSavePlayer={handleSaveAcademyPlayer}
+        onTogglePlayer={handleToggleAcademyPlayer}
       />
     ),
 
