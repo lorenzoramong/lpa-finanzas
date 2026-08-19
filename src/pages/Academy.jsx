@@ -37,7 +37,8 @@ export default function Academy({
   onSaveCycleSettings,
   payments = [],
   onChangePaymentStatus,
-  onUpdatePayment
+  onUpdatePayment,
+  onAddPaymentInstallment
 }) {
   const [coachLocation, setCoachLocation] =
     useState(null);
@@ -657,6 +658,9 @@ export default function Academy({
           }
           onUpdatePayment={
             onUpdatePayment
+          }
+          onAddInstallment={
+            onAddPaymentInstallment
           }
         />
       )}
