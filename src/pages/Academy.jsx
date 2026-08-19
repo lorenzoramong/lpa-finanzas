@@ -1,9 +1,13 @@
+import { useMemo, useState } from 'react';
 import {
   CalendarDays,
+  Edit3,
   MapPin,
   UserRound,
   Users
 } from 'lucide-react';
+
+import AcademyCoachForm from '../components/academy/AcademyCoachForm';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('es-CO', {
@@ -18,8 +22,12 @@ export default function Academy({
   coaches = [],
   players = [],
   cycles = [],
-  settings
+  settings,
+  onSaveCoach
 }) {
+  const [coachLocation, setCoachLocation] =
+    useState(null);
+
   const activePlayers = players.filter(
     (player) => player.active !== false
   );
@@ -35,6 +43,22 @@ export default function Academy({
 
   const cycleEndDay =
     settings?.cycleEndDay ?? 19;
+
+  const coachByLocation = useMemo(() => {
+    return locations.reduce((result, location) => {
+      result[location.id] =
+        coaches.find(
+          (coach) =>
+            coach.locationId === location.id
+        ) || null;
+
+      return result;
+    }, {});
+  }, [locations, coaches]);
+
+  const selectedCoach = coachLocation
+    ? coachByLocation[coachLocation.id]
+    : null;
 
   return (
     <div className="page-stack">
@@ -102,11 +126,8 @@ export default function Academy({
                 (player) => player.active !== false
               );
 
-            const locationCoach = coaches.find(
-              (coach) =>
-                coach.locationId === location.id &&
-                coach.active !== false
-            );
+            const locationCoach =
+              coachByLocation[location.id];
 
             const locationProjectedIncome =
               locationActivePlayers.reduce(
@@ -130,6 +151,19 @@ export default function Academy({
 
                     <h3>{location.name}</h3>
                   </div>
+
+                  <button
+                    type="button"
+                    className="ghost-btn"
+                    onClick={() =>
+                      setCoachLocation(location)
+                    }
+                  >
+                    <Edit3 size={16} />
+                    {locationCoach
+                      ? 'Editar entrenador'
+                      : 'Configurar entrenador'}
+                  </button>
                 </div>
 
                 <div className="tournament-card-metrics">
@@ -142,6 +176,28 @@ export default function Academy({
                     <strong>
                       {locationCoach?.name ||
                         'Sin configurar'}
+                    </strong>
+
+                    {locationCoach && (
+                      <small>
+                        {locationCoach.active !== false
+                          ? 'Activo'
+                          : 'Inactivo'}
+                      </small>
+                    )}
+                  </div>
+
+                  <div>
+                    <span>
+                      Pago por ciclo
+                    </span>
+
+                    <strong>
+                      {locationCoach
+                        ? formatCurrency(
+                            locationCoach.paymentPerCycle
+                          )
+                        : 'Sin configurar'}
                     </strong>
                   </div>
 
@@ -210,6 +266,17 @@ export default function Academy({
           </div>
         )}
       </section>
+
+      {coachLocation && (
+        <AcademyCoachForm
+          location={coachLocation}
+          coach={selectedCoach}
+          onSave={onSaveCoach}
+          onClose={() =>
+            setCoachLocation(null)
+          }
+        />
+      )}
     </div>
   );
 }
