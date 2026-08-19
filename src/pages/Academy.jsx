@@ -6,6 +6,7 @@ import {
   MapPin,
   Plus,
   Power,
+  Trash2,
   UserRound,
   Users
 } from 'lucide-react';
@@ -32,6 +33,7 @@ export default function Academy({
   onSaveCoach,
   onSavePlayer,
   onTogglePlayer,
+  onDeletePlayer,
   onSaveCycleSettings,
   payments = [],
   onChangePaymentStatus,
@@ -459,6 +461,16 @@ export default function Academy({
                                   }
                                 >
                                   <Power size={16} />
+                                </button>
+
+                                <button
+                                  type="button"
+                                  title="Eliminar jugador"
+                                  onClick={() =>
+                                    onDeletePlayer(player)
+                                  }
+                                >
+                                  <Trash2 size={16} />
                                 </button>
                               </div>
                             </td>
