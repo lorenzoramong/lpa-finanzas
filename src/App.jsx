@@ -17,6 +17,7 @@ import {
   changeAcademyPaymentStatus,
   ensureAcademyCyclePayments,
   ensureCurrentAcademyCycle,
+  removeAcademyPlayer,
   saveAcademyCycleSettings,
   updateAcademyPayment
 } from './lib/academy';
@@ -1185,6 +1186,44 @@ export default function App() {
     }
   };
 
+  const handleDeleteAcademyPlayer = async (player) => {
+    if (!player?.id) {
+      return false;
+    }
+
+    const confirmed = confirm(
+      `¿Eliminar a ${player.name || 'este jugador'} de la Academia?\n\nSi todavía no ha realizado pagos en el ciclo actual, también se eliminará su mensualidad pendiente y su proyección. Los ciclos cerrados y pagos ya realizados se conservarán como histórico.`
+    );
+
+    if (!confirmed) {
+      return false;
+    }
+
+    try {
+      await removeAcademyPlayer({
+        player,
+        cycles: academyCycles,
+        payments: academyPayments
+      });
+
+      await load();
+
+      return true;
+    } catch (error) {
+      console.error(
+        'Error al eliminar jugador de academia:',
+        error
+      );
+
+      alert(
+        error.message ||
+          'No fue posible eliminar el jugador.'
+      );
+
+      return false;
+    }
+  };
+
   const handleChangeAcademyPaymentStatus = async ({
     payment,
     status
@@ -1648,6 +1687,7 @@ export default function App() {
         onSaveCoach={handleSaveAcademyCoach}
         onSavePlayer={handleSaveAcademyPlayer}
         onTogglePlayer={handleToggleAcademyPlayer}
+        onDeletePlayer={handleDeleteAcademyPlayer}
         onSaveCycleSettings={
           handleSaveAcademyCycleSettings
         }
