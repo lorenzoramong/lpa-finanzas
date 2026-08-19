@@ -1344,6 +1344,96 @@ export async function addAcademyPaymentInstallment({
   return updatedPayment;
 }
 
+
+export async function payAcademyPaymentInFull({
+  payment,
+  date,
+  notes
+}) {
+  if (!payment?.id) {
+    throw new Error(
+      'No fue posible identificar el pago.'
+    );
+  }
+
+  const current =
+    normalizeExistingPayment(payment);
+
+  if (current.status === 'cancelled') {
+    throw new Error(
+      'No puedes registrar un pago sobre un registro anulado.'
+    );
+  }
+
+  if (current.pendingAmount <= 0) {
+    return current;
+  }
+
+  const now = new Date().toISOString();
+
+  const installment = {
+    id: crypto.randomUUID(),
+
+    amount:
+      current.pendingAmount,
+
+    date:
+      date ||
+      now.slice(0, 10),
+
+    notes:
+      String(
+        notes ||
+          (payment.kind === 'coach'
+            ? 'Pago completo al entrenador.'
+            : 'Pago completo de mensualidad.')
+      ).trim(),
+
+    createdAt: now
+  };
+
+  const draft = {
+    ...current,
+
+    installments: [
+      ...(current.installments || []),
+      installment
+    ],
+
+    updatedAt: now
+  };
+
+  const totals = getPaymentTotals(draft);
+
+  const updatedPayment = {
+    ...draft,
+    ...totals,
+
+    status: 'paid',
+
+    paymentDate:
+      installment.date,
+
+    paidAt: now
+  };
+
+  await db.put(
+    'academyPayments',
+    updatedPayment
+  );
+
+  await syncAcademyInstallmentMovement({
+    payment: updatedPayment,
+    installment
+  });
+
+  await syncAcademyProjection(
+    updatedPayment
+  );
+
+  return updatedPayment;
+}
+
 export async function changeAcademyPaymentStatus({
   payment,
   status
