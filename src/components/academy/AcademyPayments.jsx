@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import {
+  CheckCircle2,
   Edit3,
-  Plus,
+  HandCoins,
+  RotateCcw,
   Wallet,
   X
 } from 'lucide-react';
@@ -87,13 +89,16 @@ export default function AcademyPayments({
   payments = [],
   onChangeStatus,
   onUpdatePayment,
-  onAddInstallment
+  onAddInstallment,
+  onPayInFull
 }) {
   const [editingPayment, setEditingPayment] =
     useState(null);
 
-  const [installmentPayment, setInstallmentPayment] =
-    useState(null);
+  const [
+    installmentPayment,
+    setInstallmentPayment
+  ] = useState(null);
 
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
@@ -136,7 +141,8 @@ export default function AcademyPayments({
         (total, payment) =>
           total +
           Number(
-            paymentTotals(payment).pendingAmount
+            paymentTotals(payment)
+              .pendingAmount
           ),
         0
       );
@@ -187,76 +193,78 @@ export default function AcademyPayments({
     }
   };
 
-  const renderPaymentRows = (
-    list,
-    kind
+  const confirmFullPayment = async (
+    payment
   ) => {
-    if (!list.length) {
+    const totals = paymentTotals(payment);
+
+    const confirmed = confirm(
+      payment.kind === 'player'
+        ? `¿Registrar el pago completo pendiente de ${formatCurrency(
+            totals.pendingAmount
+          )} de ${payment.personName}?`
+        : `¿Confirmas que ya se pagaron ${formatCurrency(
+            totals.pendingAmount
+          )} al entrenador ${payment.personName}?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await onPayInFull({
+      payment,
+      date:
+        new Date().toISOString().slice(0, 10)
+    });
+  };
+
+  const renderPlayerRows = () => {
+    if (!playerPayments.length) {
       return (
         <tr>
           <td colSpan="6">
             <div className="empty-state">
-              {kind === 'player'
-                ? 'No hay mensualidades para este ciclo.'
-                : 'No hay obligaciones de entrenador para este ciclo.'}
+              No hay mensualidades para este ciclo.
             </div>
           </td>
         </tr>
       );
     }
 
-    return list.map((payment) => {
-      const totals =
-        paymentTotals(payment);
+    return playerPayments.map((payment) => {
+      const totals = paymentTotals(payment);
 
-      const canRegisterInstallment =
+      const open =
         payment.status !== 'cancelled' &&
-        payment.status !== 'paid' &&
-        totals.pendingAmount > 0 &&
-        !(
-          payment.kind === 'coach' &&
-          payment.status === 'projected'
-        );
+        totals.pendingAmount > 0;
 
       return (
         <tr key={payment.id}>
           <td>
-            <strong>
-              {payment.personName}
-            </strong>
+            <strong>{payment.personName}</strong>
 
             <small>
               {totals.paidAmount > 0
                 ? `${formatCurrency(
                     totals.paidAmount
                   )} abonados`
-                : payment.status === 'projected'
-                  ? 'Obligación proyectada'
-                  : 'Sin abonos'}
+                : 'Sin pagos registrados'}
             </small>
           </td>
 
           <td>
-            {payment.locationName ||
-              'Sin sede'}
+            {payment.locationName || 'Sin sede'}
           </td>
 
           <td>
             <strong>
-              {formatCurrency(
-                totals.amount
-              )}
+              {formatCurrency(totals.amount)}
             </strong>
           </td>
 
           <td>
-            <strong
-              className={
-                totals.pendingAmount > 0
-                  ? ''
-                  : 'positive'
-              }
-            >
+            <strong>
               {formatCurrency(
                 totals.pendingAmount
               )}
@@ -269,25 +277,160 @@ export default function AcademyPayments({
                 payment.status
               )}`}
             >
-              {statusLabel(
-                payment.status
-              )}
+              {statusLabel(payment.status)}
             </span>
           </td>
 
           <td>
             <div className="tournament-row-actions">
-              {canRegisterInstallment && (
+              {open && (
+                <>
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    title="Registrar pago completo"
+                    onClick={() =>
+                      confirmFullPayment(payment)
+                    }
+                  >
+                    <CheckCircle2 size={16} />
+                    Pago completo
+                  </button>
+
+                  <button
+                    type="button"
+                    className="ghost-btn"
+                    title="Registrar abono parcial"
+                    onClick={() =>
+                      setInstallmentPayment(
+                        payment
+                      )
+                    }
+                  >
+                    <HandCoins size={16} />
+                    Abono
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                title="Editar valor total"
+                onClick={() =>
+                  openEditor(payment)
+                }
+              >
+                <Edit3 size={16} />
+              </button>
+
+              {payment.status !== 'cancelled' ? (
                 <button
                   type="button"
-                  title="Registrar pago o abono"
+                  title="Anular"
                   onClick={() =>
-                    setInstallmentPayment(
-                      payment
-                    )
+                    onChangeStatus({
+                      payment,
+                      status: 'cancelled'
+                    })
                   }
                 >
-                  <Plus size={16} />
+                  <X size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  title="Reactivar"
+                  onClick={() =>
+                    onChangeStatus({
+                      payment,
+                      status: 'pending'
+                    })
+                  }
+                >
+                  <RotateCcw size={16} />
+                </button>
+              )}
+            </div>
+          </td>
+        </tr>
+      );
+    });
+  };
+
+  const renderCoachRows = () => {
+    if (!coachPayments.length) {
+      return (
+        <tr>
+          <td colSpan="6">
+            <div className="empty-state">
+              No hay obligaciones de entrenador para este ciclo.
+            </div>
+          </td>
+        </tr>
+      );
+    }
+
+    return coachPayments.map((payment) => {
+      const totals = paymentTotals(payment);
+
+      const canPay =
+        payment.status !== 'paid' &&
+        payment.status !== 'cancelled' &&
+        totals.pendingAmount > 0;
+
+      return (
+        <tr key={payment.id}>
+          <td>
+            <strong>{payment.personName}</strong>
+
+            <small>
+              {payment.status === 'paid'
+                ? 'Pago enviado al flujo de caja'
+                : 'Pago del ciclo'}
+            </small>
+          </td>
+
+          <td>
+            {payment.locationName || 'Sin sede'}
+          </td>
+
+          <td>
+            <strong>
+              {formatCurrency(totals.amount)}
+            </strong>
+          </td>
+
+          <td>
+            <strong>
+              {formatCurrency(
+                totals.pendingAmount
+              )}
+            </strong>
+          </td>
+
+          <td>
+            <span
+              className={`tournament-status-pill ${statusClass(
+                payment.status
+              )}`}
+            >
+              {statusLabel(payment.status)}
+            </span>
+          </td>
+
+          <td>
+            <div className="tournament-row-actions">
+              {canPay && (
+                <button
+                  type="button"
+                  className="primary-btn"
+                  title="Marcar entrenador como pagado"
+                  onClick={() =>
+                    confirmFullPayment(payment)
+                  }
+                >
+                  <CheckCircle2 size={16} />
+                  Marcar pagado
                 </button>
               )}
 
@@ -301,8 +444,7 @@ export default function AcademyPayments({
                 <Edit3 size={16} />
               </button>
 
-              {payment.status !==
-                'cancelled' && (
+              {payment.status !== 'cancelled' ? (
                 <button
                   type="button"
                   title="Anular"
@@ -315,10 +457,7 @@ export default function AcademyPayments({
                 >
                   <X size={16} />
                 </button>
-              )}
-
-              {payment.status ===
-                'cancelled' && (
+              ) : (
                 <button
                   type="button"
                   title="Reactivar"
@@ -326,14 +465,13 @@ export default function AcademyPayments({
                     onChangeStatus({
                       payment,
                       status:
-                        payment.kind === 'coach' &&
-                        cycle.status !== 'closed'
-                          ? 'projected'
-                          : 'pending'
+                        cycle.status === 'closed'
+                          ? 'pending'
+                          : 'projected'
                     })
                   }
                 >
-                  <Wallet size={16} />
+                  <RotateCcw size={16} />
                 </button>
               )}
             </div>
@@ -422,10 +560,7 @@ export default function AcademyPayments({
               </thead>
 
               <tbody>
-                {renderPaymentRows(
-                  playerPayments,
-                  'player'
-                )}
+                {renderPlayerRows()}
               </tbody>
             </table>
           </div>
@@ -456,10 +591,7 @@ export default function AcademyPayments({
               </thead>
 
               <tbody>
-                {renderPaymentRows(
-                  coachPayments,
-                  'coach'
-                )}
+                {renderCoachRows()}
               </tbody>
             </table>
           </div>
@@ -555,7 +687,7 @@ export default function AcademyPayments({
                         event.target.value
                       )
                     }
-                    placeholder="Motivo del ajuste, descuento u observación"
+                    placeholder="Motivo del ajuste u observación"
                   />
                 </label>
               </div>
