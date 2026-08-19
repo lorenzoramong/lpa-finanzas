@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   CalendarDays,
   Edit3,
+  Settings2,
   MapPin,
   Plus,
   Power,
@@ -11,6 +12,7 @@ import {
 
 import AcademyCoachForm from '../components/academy/AcademyCoachForm';
 import AcademyPlayerForm from '../components/academy/AcademyPlayerForm';
+import AcademyCycleSettingsForm from '../components/academy/AcademyCycleSettingsForm';
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('es-CO', {
@@ -28,7 +30,8 @@ export default function Academy({
   settings,
   onSaveCoach,
   onSavePlayer,
-  onTogglePlayer
+  onTogglePlayer,
+  onSaveCycleSettings
 }) {
   const [coachLocation, setCoachLocation] =
     useState(null);
@@ -38,6 +41,9 @@ export default function Academy({
 
   const [editingPlayer, setEditingPlayer] =
     useState(null);
+
+  const [showCycleSettings, setShowCycleSettings] =
+    useState(false);
 
   const activePlayers = players.filter(
     (player) => player.active !== false
@@ -71,6 +77,52 @@ export default function Academy({
     ? coachByLocation[coachLocation.id]
     : null;
 
+  const currentCycle = useMemo(() => {
+    return [...cycles]
+      .filter(
+        (cycle) => cycle.status === 'active'
+      )
+      .sort((a, b) =>
+        String(b.startDate || '').localeCompare(
+          String(a.startDate || '')
+        )
+      )[0] || null;
+  }, [cycles]);
+
+  const cycleProjectedIncome =
+    currentCycle?.projectedIncome ??
+    projectedIncome;
+
+  const cycleProjectedCoachExpense =
+    Number(
+      currentCycle?.projectedCoachExpense || 0
+    );
+
+  const cycleProjectedUtility =
+    Number(
+      currentCycle?.projectedUtility ??
+        cycleProjectedIncome -
+          cycleProjectedCoachExpense
+    );
+
+  const formatCycleDate = (value) => {
+    if (!value) {
+      return 'Sin fecha';
+    }
+
+    const date = new Date(`${value}T00:00:00`);
+
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+
+    return new Intl.DateTimeFormat('es-CO', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }).format(date);
+  };
+
   return (
     <div className="page-stack">
       <section className="page-header">
@@ -97,7 +149,7 @@ export default function Academy({
         <article className="tournament-kpi-card income">
           <small>Ingreso proyectado</small>
           <strong>
-            {formatCurrency(projectedIncome)}
+            {formatCurrency(cycleProjectedIncome)}
           </strong>
         </article>
 
@@ -109,7 +161,9 @@ export default function Academy({
         <article className="tournament-kpi-card expense">
           <small>Ciclo actual</small>
           <strong>
-            {cycleStartDay} → {cycleEndDay}
+            {currentCycle
+              ? `${currentCycle.cycleRuleSnapshot?.cycleStartDay ?? cycleStartDay} → ${currentCycle.cycleRuleSnapshot?.cycleEndDay ?? cycleEndDay}`
+              : `${cycleStartDay} → ${cycleEndDay}`}
           </strong>
         </article>
       </section>
@@ -426,32 +480,167 @@ export default function Academy({
             <h2>Control mensual</h2>
           </div>
 
-          <CalendarDays size={24} />
+          <button
+            type="button"
+            className="ghost-btn"
+            onClick={() =>
+              setShowCycleSettings(true)
+            }
+          >
+            <Settings2 size={17} />
+            Configurar ciclos
+          </button>
         </div>
 
-        <p className="muted">
-          El ciclo inicial está configurado del día{' '}
-          {cycleStartDay} al día {cycleEndDay}. La estructura
-          queda preparada para administrar y editar los ciclos
-          en los siguientes pasos.
-        </p>
+        {currentCycle ? (
+          <div className="tournament-section-stack">
+            <div className="tournament-comparison-list">
+              <div>
+                <span>Ciclo vigente</span>
 
-        {!!cycles.length && (
-          <div className="tournament-comparison-list">
-            {cycles.slice(0, 3).map((cycle) => (
-              <div key={cycle.id}>
+                <strong>
+                  {formatCycleDate(
+                    currentCycle.startDate
+                  )}{' '}
+                  →{' '}
+                  {formatCycleDate(
+                    currentCycle.endDate
+                  )}
+                </strong>
+              </div>
+
+              <div>
                 <span>
-                  {cycle.name || 'Ciclo academia'}
+                  Jugadores incluidos al iniciar
                 </span>
 
                 <strong>
-                  {cycle.status || 'Pendiente'}
+                  {currentCycle.projectedPlayers || 0}
                 </strong>
               </div>
-            ))}
+
+              <div>
+                <span>
+                  Ingreso esperado del ciclo
+                </span>
+
+                <strong className="positive">
+                  {formatCurrency(
+                    cycleProjectedIncome
+                  )}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Pago proyectado entrenadores
+                </span>
+
+                <strong className="negative">
+                  {formatCurrency(
+                    cycleProjectedCoachExpense
+                  )}
+                </strong>
+              </div>
+
+              <div>
+                <span>
+                  Resultado proyectado
+                </span>
+
+                <strong>
+                  {formatCurrency(
+                    cycleProjectedUtility
+                  )}
+                </strong>
+              </div>
+            </div>
+
+            {!!currentCycle.coachSnapshots?.length && (
+              <div className="tournament-registration-summary">
+                {currentCycle.coachSnapshots.map(
+                  (coach) => (
+                    <div key={coach.coachId}>
+                      <strong>
+                        {formatCurrency(
+                          coach.paymentPerCycle
+                        )}
+                      </strong>
+
+                      <span>
+                        {coach.name} ·{' '}
+                        {coach.locationName}
+                      </span>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="empty-state">
+            <CalendarDays size={34} />
+
+            <strong>
+              El ciclo vigente se creará
+              automáticamente.
+            </strong>
+          </div>
+        )}
+
+        {!!cycles.length && (
+          <div
+            className="tournament-import-history"
+            style={{ marginTop: 22 }}
+          >
+            <h3>Historial reciente</h3>
+
+            {[...cycles]
+              .sort((a, b) =>
+                String(b.startDate || '').localeCompare(
+                  String(a.startDate || '')
+                )
+              )
+              .slice(0, 4)
+              .map((cycle) => (
+                <article key={cycle.id}>
+                  <strong>
+                    {formatCycleDate(
+                      cycle.startDate
+                    )}{' '}
+                    →{' '}
+                    {formatCycleDate(
+                      cycle.endDate
+                    )}
+                  </strong>
+
+                  <span>
+                    {cycle.status === 'active'
+                      ? 'Activo'
+                      : 'Cerrado'}{' '}
+                    ·{' '}
+                    {cycle.projectedPlayers || 0}{' '}
+                    jugadores ·{' '}
+                    {formatCurrency(
+                      cycle.projectedIncome || 0
+                    )}{' '}
+                    esperados
+                  </span>
+                </article>
+              ))}
           </div>
         )}
       </section>
+
+      {showCycleSettings && (
+        <AcademyCycleSettingsForm
+          settings={settings}
+          onSave={onSaveCycleSettings}
+          onClose={() =>
+            setShowCycleSettings(false)
+          }
+        />
+      )}
 
       {playerLocation && (
         <AcademyPlayerForm
