@@ -18,6 +18,7 @@ import {
   changeAcademyPaymentStatus,
   ensureAcademyCyclePayments,
   ensureCurrentAcademyCycle,
+  payAcademyPaymentInFull,
   removeAcademyPlayer,
   saveAcademyCycleSettings,
   updateAcademyPayment
@@ -1225,6 +1226,37 @@ export default function App() {
     }
   };
 
+  const handlePayAcademyPaymentInFull = async ({
+    payment,
+    date,
+    notes
+  }) => {
+    try {
+      const saved =
+        await payAcademyPaymentInFull({
+          payment,
+          date,
+          notes
+        });
+
+      await load();
+
+      return saved;
+    } catch (error) {
+      console.error(
+        'Error al registrar pago completo de academia:',
+        error
+      );
+
+      alert(
+        error.message ||
+          'No fue posible registrar el pago completo.'
+      );
+
+      return null;
+    }
+  };
+
   const handleAddAcademyPaymentInstallment = async ({
     payment,
     amount,
@@ -1734,6 +1766,9 @@ export default function App() {
         }
         onAddPaymentInstallment={
           handleAddAcademyPaymentInstallment
+        }
+        onPayPaymentInFull={
+          handlePayAcademyPaymentInFull
         }
       />
     ),
