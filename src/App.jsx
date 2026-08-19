@@ -929,6 +929,87 @@ export default function App() {
     return importRecord;
   };
 
+  const handleSaveAcademyCoach = async (coachData) => {
+    if (!coachData?.locationId) {
+      alert('No fue posible identificar la sede.');
+      return null;
+    }
+
+    try {
+      const existingCoach = academyCoaches.find(
+        (coach) =>
+          coach.locationId === coachData.locationId
+      );
+
+      const now = new Date().toISOString();
+
+      const coach = {
+        ...existingCoach,
+        ...coachData,
+
+        id:
+          existingCoach?.id ||
+          coachData.id ||
+          crypto.randomUUID(),
+
+        name: String(
+          coachData.name || ''
+        ).trim(),
+
+        phone: String(
+          coachData.phone || ''
+        ).trim(),
+
+        email: String(
+          coachData.email || ''
+        ).trim(),
+
+        paymentPerCycle: Number(
+          coachData.paymentPerCycle || 0
+        ),
+
+        active:
+          coachData.active !== false,
+
+        notes: String(
+          coachData.notes || ''
+        ).trim(),
+
+        createdAt:
+          existingCoach?.createdAt ||
+          coachData.createdAt ||
+          now,
+
+        updatedAt: now
+      };
+
+      if (!coach.name) {
+        alert('El entrenador debe tener un nombre.');
+        return null;
+      }
+
+      await db.put(
+        'academyCoaches',
+        coach
+      );
+
+      await load();
+
+      return coach;
+    } catch (error) {
+      console.error(
+        'Error al guardar entrenador:',
+        error
+      );
+
+      alert(
+        'No fue posible guardar el entrenador.'
+      );
+
+      return null;
+    }
+  };
+
   const addCategory = async (category) => {
     try {
       await db.put('categories', {
@@ -1244,6 +1325,7 @@ export default function App() {
         players={academyPlayers}
         cycles={academyCycles}
         settings={academySettings}
+        onSaveCoach={handleSaveAcademyCoach}
       />
     ),
 
