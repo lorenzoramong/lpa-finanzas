@@ -982,3 +982,146 @@ export async function changeAcademyPaymentStatus({
 
   return updatedPayment;
 }
+
+
+/* =========================================================
+   ELIMINAR JUGADOR DE ACADEMIA
+   ========================================================= */
+
+export async function removeAcademyPlayer({
+  player,
+  cycles = [],
+  payments = []
+}) {
+  if (!player?.id) {
+    throw new Error(
+      'No fue posible identificar el jugador.'
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  /*
+   * El jugador se elimina de la base activa de Academia.
+   * Los ciclos cerrados permanecen intactos como histórico.
+   */
+  await db.delete(
+    'academyPlayers',
+    player.id
+  );
+
+  const activeCycles = cycles.filter(
+    (cycle) => cycle.status === 'active'
+  );
+
+  for (const cycle of activeCycles) {
+    const playerSnapshots =
+      cycle.playerSnapshots || [];
+
+    const existsInCycle =
+      playerSnapshots.some(
+        (snapshot) =>
+          snapshot.playerId === player.id
+      );
+
+    if (!existsInCycle) {
+      continue;
+    }
+
+    const paymentId =
+      `academy-payment-${cycle.id}-player-${player.id}`;
+
+    const payment =
+      payments.find(
+        (item) => item.id === paymentId
+      );
+
+    /*
+     * Si ya hubo un pago real, conservamos el registro del
+     * ciclo vigente para no alterar el histórico financiero.
+     * El jugador sí desaparece de la lista general.
+     */
+    if (payment?.status === 'paid') {
+      continue;
+    }
+
+    const nextPlayerSnapshots =
+      playerSnapshots.filter(
+        (snapshot) =>
+          snapshot.playerId !== player.id
+      );
+
+    const projectedIncome =
+      nextPlayerSnapshots.reduce(
+        (total, snapshot) =>
+          total +
+          Number(snapshot.monthlyFee || 0),
+        0
+      );
+
+    const projectedCoachExpense =
+      Number(
+        cycle.projectedCoachExpense || 0
+      );
+
+    await db.put(
+      'academyCycles',
+      {
+        ...cycle,
+
+        playerSnapshots:
+          nextPlayerSnapshots,
+
+        projectedPlayers:
+          nextPlayerSnapshots.length,
+
+        projectedIncome,
+
+        projectedUtility:
+          projectedIncome -
+          projectedCoachExpense,
+
+        updatedAt: now
+      }
+    );
+
+    if (payment) {
+      await db.delete(
+        'academyPayments',
+        payment.id
+      );
+    }
+
+    const projectionId =
+      academyPaymentProjectionId(paymentId);
+
+    const projection = await db.get(
+      'projections',
+      projectionId
+    );
+
+    if (projection) {
+      await db.delete(
+        'projections',
+        projectionId
+      );
+    }
+
+    const movementId =
+      academyPaymentMovementId(paymentId);
+
+    const movement = await db.get(
+      'movements',
+      movementId
+    );
+
+    if (movement) {
+      await db.delete(
+        'movements',
+        movementId
+      );
+    }
+  }
+
+  return true;
+}
