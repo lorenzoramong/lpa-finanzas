@@ -1,9 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  CheckCircle2,
-  Edit3,
-  HandCoins,
-  RotateCcw,
+  MoreHorizontal,
   Wallet,
   X
 } from 'lucide-react';
@@ -219,6 +216,49 @@ export default function AcademyPayments({
     });
   };
 
+  const handleAction = async (
+    payment,
+    action
+  ) => {
+    if (!action) {
+      return;
+    }
+
+    if (action === 'full') {
+      await confirmFullPayment(payment);
+      return;
+    }
+
+    if (action === 'installment') {
+      setInstallmentPayment(payment);
+      return;
+    }
+
+    if (action === 'edit') {
+      openEditor(payment);
+      return;
+    }
+
+    if (action === 'cancel') {
+      await onChangeStatus({
+        payment,
+        status: 'cancelled'
+      });
+      return;
+    }
+
+    if (action === 'reactivate') {
+      await onChangeStatus({
+        payment,
+        status:
+          payment.kind === 'coach' &&
+          cycle.status !== 'closed'
+            ? 'projected'
+            : 'pending'
+      });
+    }
+  };
+
   const renderPlayerRows = () => {
     if (!playerPayments.length) {
       return (
@@ -282,74 +322,75 @@ export default function AcademyPayments({
           </td>
 
           <td>
-            <div className="tournament-row-actions">
-              {open && (
-                <>
-                  <button
-                    type="button"
-                    className="primary-btn"
-                    title="Registrar pago completo"
-                    onClick={() =>
-                      confirmFullPayment(payment)
-                    }
-                  >
-                    <CheckCircle2 size={16} />
-                    Pago completo
-                  </button>
+            <div
+              style={{
+                position: 'relative',
+                minWidth: 150
+              }}
+            >
+              <MoreHorizontal
+                size={17}
+                style={{
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  pointerEvents: 'none'
+                }}
+              />
 
-                  <button
-                    type="button"
-                    className="ghost-btn"
-                    title="Registrar abono parcial"
-                    onClick={() =>
-                      setInstallmentPayment(
-                        payment
-                      )
-                    }
-                  >
-                    <HandCoins size={16} />
-                    Abono
-                  </button>
-                </>
-              )}
+              <select
+                value=""
+                onChange={(event) => {
+                  handleAction(
+                    payment,
+                    event.target.value
+                  );
 
-              <button
-                type="button"
-                title="Editar valor total"
-                onClick={() =>
-                  openEditor(payment)
-                }
+                  event.target.value = '';
+                }}
+                style={{
+                  width: '100%',
+                  minHeight: 40,
+                  padding: '0 34px 0 38px',
+                  border: '1px solid #dbe4ef',
+                  borderRadius: 12,
+                  background: '#f8fafc',
+                  fontWeight: 800,
+                  color: '#172a46',
+                  cursor: 'pointer'
+                }}
               >
-                <Edit3 size={16} />
-              </button>
+                <option value="">
+                  Acciones
+                </option>
 
-              {payment.status !== 'cancelled' ? (
-                <button
-                  type="button"
-                  title="Anular"
-                  onClick={() =>
-                    onChangeStatus({
-                      payment,
-                      status: 'cancelled'
-                    })
-                  }
-                >
-                  <X size={16} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  title="Reactivar"
-                  onClick={() =>
-                    onChangeStatus({
-                      payment,
-                      status: 'pending'
-                    })
-                  }
-                >
-                  <RotateCcw size={16} />
-                </button>
-              )}
+                {open && (
+                  <option value="full">
+                    Pago completo
+                  </option>
+                )}
+
+                {open && (
+                  <option value="installment">
+                    Registrar abono
+                  </option>
+                )}
+
+                <option value="edit">
+                  Editar valor
+                </option>
+
+                {payment.status !== 'cancelled' ? (
+                  <option value="cancel">
+                    Anular
+                  </option>
+                ) : (
+                  <option value="reactivate">
+                    Reactivar
+                  </option>
+                )}
+              </select>
             </div>
           </td>
         </tr>
@@ -419,61 +460,69 @@ export default function AcademyPayments({
           </td>
 
           <td>
-            <div className="tournament-row-actions">
-              {canPay && (
-                <button
-                  type="button"
-                  className="primary-btn"
-                  title="Marcar entrenador como pagado"
-                  onClick={() =>
-                    confirmFullPayment(payment)
-                  }
-                >
-                  <CheckCircle2 size={16} />
-                  Marcar pagado
-                </button>
-              )}
+            <div
+              style={{
+                position: 'relative',
+                minWidth: 150
+              }}
+            >
+              <MoreHorizontal
+                size={17}
+                style={{
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  pointerEvents: 'none'
+                }}
+              />
 
-              <button
-                type="button"
-                title="Editar valor total"
-                onClick={() =>
-                  openEditor(payment)
-                }
+              <select
+                value=""
+                onChange={(event) => {
+                  handleAction(
+                    payment,
+                    event.target.value
+                  );
+
+                  event.target.value = '';
+                }}
+                style={{
+                  width: '100%',
+                  minHeight: 40,
+                  padding: '0 34px 0 38px',
+                  border: '1px solid #dbe4ef',
+                  borderRadius: 12,
+                  background: '#f8fafc',
+                  fontWeight: 800,
+                  color: '#172a46',
+                  cursor: 'pointer'
+                }}
               >
-                <Edit3 size={16} />
-              </button>
+                <option value="">
+                  Acciones
+                </option>
 
-              {payment.status !== 'cancelled' ? (
-                <button
-                  type="button"
-                  title="Anular"
-                  onClick={() =>
-                    onChangeStatus({
-                      payment,
-                      status: 'cancelled'
-                    })
-                  }
-                >
-                  <X size={16} />
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  title="Reactivar"
-                  onClick={() =>
-                    onChangeStatus({
-                      payment,
-                      status:
-                        cycle.status === 'closed'
-                          ? 'pending'
-                          : 'projected'
-                    })
-                  }
-                >
-                  <RotateCcw size={16} />
-                </button>
-              )}
+                {canPay && (
+                  <option value="full">
+                    Marcar pagado
+                  </option>
+                )}
+
+                <option value="edit">
+                  Editar valor
+                </option>
+
+                {payment.status !== 'cancelled' ? (
+                  <option value="cancel">
+                    Anular
+                  </option>
+                ) : (
+                  <option value="reactivate">
+                    Reactivar
+                  </option>
+                )}
+              </select>
             </div>
           </td>
         </tr>
