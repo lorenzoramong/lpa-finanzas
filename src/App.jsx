@@ -205,9 +205,30 @@ export default function App() {
           }
         }
       );
-    } catch (error) {
+        } catch (error) {
       console.error('Error al cargar la aplicación:', error);
-      alert('No fue posible cargar la información.');
+
+      const errorMessage =
+        error?.message ||
+        String(error) ||
+        'Error desconocido';
+
+      const errorCode =
+        error?.code
+          ? `\nCódigo: ${error.code}`
+          : '';
+
+      const errorStack =
+        error?.stack
+          ? `\n\nStack:\n${error.stack}`
+          : '';
+
+      alert(
+        `No fue posible cargar la información.\n\n` +
+        `Error: ${errorMessage}` +
+        errorCode +
+        errorStack
+      );
     } finally {
       setLoading(false);
     }
